@@ -17,13 +17,13 @@ on:
 
 env:
   PUSH_REGION: ${{ inputs.region || 'both' }}
-  ECR_REGISTRY: ${{ vars.AWS_US_ECR_REGISTRY || '928112001319.dkr.ecr.us-east-1.amazonaws.com' }}
-  ECR_US_REGISTRY: ${{ vars.AWS_US_ECR_REGISTRY || '928112001319.dkr.ecr.us-east-1.amazonaws.com' }}
-  ECR_US_REGION: ${{ vars.AWS_US_REGION || 'us-east-1' }}
-  ECR_US_REPOSITORY: ${{ vars.AWS_US_ECR_REPOSITORY || 'open/open-newapi' }}
-  ECR_CN_REGISTRY: ${{ vars.AWS_CN_ECR_REGISTRY || '247328583315.dkr.ecr.cn-northwest-1.amazonaws.com.cn' }}
-  ECR_CN_REGION: ${{ vars.AWS_CN_REGION || 'cn-northwest-1' }}
-  ECR_CN_REPOSITORY: ${{ vars.AWS_CN_ECR_REPOSITORY || 'open/open-newapi' }}
+  ECR_REGISTRY: 928112001319.dkr.ecr.us-east-1.amazonaws.com
+  ECR_US_REGISTRY: 928112001319.dkr.ecr.us-east-1.amazonaws.com
+  ECR_US_REGION: us-east-1
+  ECR_US_REPOSITORY: open/open-newapi
+  ECR_CN_REGISTRY: 247328583315.dkr.ecr.cn-northwest-1.amazonaws.com.cn
+  ECR_CN_REGION: cn-northwest-1
+  ECR_CN_REPOSITORY: open/open-newapi
   PROJECT: open-newapi
   COMPOSE_FILE: /www/devops/deployments/test/open-newapi/docker-compose.yaml
 
