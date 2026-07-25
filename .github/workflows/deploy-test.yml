@@ -20,12 +20,12 @@ env:
   ECR_REGISTRY: ${{ vars.AWS_US_ECR_REGISTRY || '928112001319.dkr.ecr.us-east-1.amazonaws.com' }}
   ECR_US_REGISTRY: ${{ vars.AWS_US_ECR_REGISTRY || '928112001319.dkr.ecr.us-east-1.amazonaws.com' }}
   ECR_US_REGION: ${{ vars.AWS_US_REGION || 'us-east-1' }}
-  ECR_US_REPOSITORY: ${{ vars.AWS_US_ECR_REPOSITORY || 'botlearn/new-api' }}
-  ECR_CN_REGISTRY: ${{ vars.AWS_CN_ECR_REGISTRY }}
+  ECR_US_REPOSITORY: ${{ vars.AWS_US_ECR_REPOSITORY || 'open/open-newapi' }}
+  ECR_CN_REGISTRY: ${{ vars.AWS_CN_ECR_REGISTRY || '247328583315.dkr.ecr.cn-northwest-1.amazonaws.com.cn' }}
   ECR_CN_REGION: ${{ vars.AWS_CN_REGION || 'cn-northwest-1' }}
-  ECR_CN_REPOSITORY: ${{ vars.AWS_CN_ECR_REPOSITORY || 'botlearn/new-api' }}
-  PROJECT: new-api
-  COMPOSE_FILE: /www/devops/deployments/test/botcord-new-api/docker-compose.yaml
+  ECR_CN_REPOSITORY: ${{ vars.AWS_CN_ECR_REPOSITORY || 'open/open-newapi' }}
+  PROJECT: open-newapi
+  COMPOSE_FILE: /www/devops/deployments/test/open-newapi/docker-compose.yaml
 
 concurrency:
   group: deploy-test
@@ -77,7 +77,7 @@ jobs:
             exit 1
           fi
 
-          if ! git -C /www/devops diff --quiet -- deployments/test/botcord-new-api/docker-compose.yaml; then
+          if ! git -C /www/devops diff --quiet -- deployments/test/open-newapi/docker-compose.yaml; then
             echo "::error::GitOps test configuration has server-local changes"
             exit 1
           fi
@@ -85,22 +85,22 @@ jobs:
       - name: Deploy test (docker compose)
         if: env.PUSH_REGION == 'us' || env.PUSH_REGION == 'both'
         run: |
-          docker compose -f "$COMPOSE_FILE" pull botcord-new-api
-          docker compose -f "$COMPOSE_FILE" up -d botcord-new-api
+          docker compose -f "$COMPOSE_FILE" pull open-newapi
+          docker compose -f "$COMPOSE_FILE" up -d open-newapi
           echo "✅ Test deployment restarted"
 
       - name: Health check
         if: env.PUSH_REGION == 'us' || env.PUSH_REGION == 'both'
         run: |
-          for i in $(seq 1 20); do
-            if curl -fsS http://localhost:8042/api/status | grep -Eq '"success"[[:space:]]*:[[:space:]]*true'; then
+          for _ in $(seq 1 20); do
+            if curl -fsS http://localhost:8054/api/status | grep -Eq '"success"[[:space:]]*:[[:space:]]*true'; then
               echo "✅ Service healthy"
               exit 0
             fi
             sleep 3
           done
           echo "❌ Health check failed"
-          docker compose -f "$COMPOSE_FILE" logs --tail=50 botcord-new-api
+          docker compose -f "$COMPOSE_FILE" logs --tail=50 open-newapi
           exit 1
 
       - name: Log in to CN ECR
