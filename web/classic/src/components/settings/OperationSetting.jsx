@@ -25,6 +25,7 @@ import SettingsSidebarModulesAdmin from '../../pages/Setting/Operation/SettingsS
 import SettingsSensitiveWords from '../../pages/Setting/Operation/SettingsSensitiveWords';
 import SettingsLog from '../../pages/Setting/Operation/SettingsLog';
 import SettingsMonitoring from '../../pages/Setting/Operation/SettingsMonitoring';
+import SettingsLarkNotify from '../../pages/Setting/Operation/SettingsLarkNotify';
 import SettingsCreditLimit from '../../pages/Setting/Operation/SettingsCreditLimit';
 import SettingsCheckin from '../../pages/Setting/Operation/SettingsCheckin';
 import { API, showError, toBoolean } from '../../helpers';
@@ -74,7 +75,18 @@ const OperationSetting = () => {
     AutomaticRetryStatusCodes:
       '100-199,300-399,401-407,409-499,500-503,505-523,525-599',
     'monitor_setting.auto_test_channel_enabled': false,
-    'monitor_setting.auto_test_channel_minutes': 10 /* 签到设置 */,
+    'monitor_setting.auto_test_channel_minutes': 10,
+
+    /* 飞书告警设置 */
+    // 这里必须声明类型：getOptions 用 typeof inputs[key] === 'boolean' 决定是否做
+    // 布尔转换，缺声明时开关会拿到字符串 "false"（非空字符串为真）而错误地显示为开启。
+    // sign_secret 不在此列 —— GetOptions 会过滤掉它，它是只写字段。
+    'lark_notify_setting.enabled': false,
+    'lark_notify_setting.webhook_url': '',
+    'lark_notify_setting.alert_on_relay_error': true,
+    'lark_notify_setting.alert_on_channel_test': false,
+    'lark_notify_setting.throttle_seconds': 0,
+    'lark_notify_setting.use_card': true /* 签到设置 */,
     'checkin_setting.enabled': false,
     'checkin_setting.min_quota': 1000,
     'checkin_setting.max_quota': 10000,
@@ -145,6 +157,10 @@ const OperationSetting = () => {
         {/* 监控设置 */}
         <Card style={{ marginTop: '10px' }}>
           <SettingsMonitoring options={inputs} refresh={onRefresh} />
+        </Card>
+        {/* 飞书告警设置 */}
+        <Card style={{ marginTop: '10px' }}>
+          <SettingsLarkNotify options={inputs} refresh={onRefresh} />
         </Card>
         {/* 额度设置 */}
         <Card style={{ marginTop: '10px' }}>

@@ -92,6 +92,8 @@ const PersonalSetting = () => {
     gotifyUrl: '',
     gotifyToken: '',
     gotifyPriority: 5,
+    larkWebhookUrl: '',
+    larkSignSecret: '',
     upstreamModelUpdateNotifyEnabled: false,
     acceptUnsetModelRatioModel: false,
     recordIpLog: false,
@@ -193,6 +195,8 @@ const PersonalSetting = () => {
         gotifyToken: settings.gotify_token || '',
         gotifyPriority:
           settings.gotify_priority !== undefined ? settings.gotify_priority : 5,
+        larkWebhookUrl: settings.lark_webhook_url || '',
+        larkSignSecret: settings.lark_sign_secret || '',
         upstreamModelUpdateNotifyEnabled:
           settings.upstream_model_update_notify_enabled === true,
         acceptUnsetModelRatioModel:
@@ -523,6 +527,8 @@ const PersonalSetting = () => {
           const parsed = parseInt(notificationSettings.gotifyPriority);
           return isNaN(parsed) ? 5 : parsed;
         })(),
+        lark_webhook_url: notificationSettings.larkWebhookUrl,
+        lark_sign_secret: notificationSettings.larkSignSecret,
         upstream_model_update_notify_enabled:
           notificationSettings.upstreamModelUpdateNotifyEnabled === true,
         accept_unset_model_ratio_model:
