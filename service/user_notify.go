@@ -101,6 +101,13 @@ func NotifyUser(userId int, userEmail string, userSetting dto.UserSetting, data 
 			return nil
 		}
 		return sendGotifyNotify(gotifyUrl, gotifyToken, userSetting.GotifyPriority, data)
+	case dto.NotifyTypeLark:
+		larkWebhookUrl := userSetting.LarkWebhookUrl
+		if larkWebhookUrl == "" {
+			common.SysLog(fmt.Sprintf("user %d has no lark webhook url, skip sending lark", userId))
+			return nil
+		}
+		return SendLarkNotify(larkWebhookUrl, userSetting.LarkSignSecret, data)
 	}
 	return nil
 }
