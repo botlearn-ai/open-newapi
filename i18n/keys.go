@@ -248,6 +248,9 @@ const (
 	MsgSettingGotifyUrlInvalid = "setting.gotify_url_invalid"
 	MsgSettingUrlMustHttp      = "setting.url_must_http"
 	MsgSettingSaved            = "setting.saved"
+
+	MsgSettingLarkWebhookEmpty   = "setting.lark_webhook_empty"
+	MsgSettingLarkWebhookInvalid = "setting.lark_webhook_invalid"
 )
 
 // Deployment related messages (io.net)

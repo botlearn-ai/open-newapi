@@ -209,6 +209,8 @@ setting.bark_url_invalid: "无效的Bark推送URL"
 setting.gotify_url_empty: "Gotify服务器地址不能为空"
 setting.gotify_token_empty: "Gotify令牌不能为空"
 setting.gotify_url_invalid: "无效的Gotify服务器地址"
+setting.lark_webhook_empty: "飞书 Webhook 地址不能为空"
+setting.lark_webhook_invalid: "无效的飞书 Webhook 地址，必须以 https:// 开头"
 setting.url_must_http: "URL必须以http://或https://开头"
 setting.saved: "设置已更新"
 

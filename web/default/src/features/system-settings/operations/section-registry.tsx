@@ -18,6 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { SystemBehaviorSection } from '../general/system-behavior-section'
 import { EmailSettingsSection } from '../integrations/email-settings-section'
+import { LarkNotifySettingsSection } from '../integrations/lark-notify-settings-section'
 import { MonitoringSettingsSection } from '../integrations/monitoring-settings-section'
 import { WorkerSettingsSection } from '../integrations/worker-settings-section'
 import { LogSettingsSection } from '../maintenance/log-settings-section'
@@ -59,6 +60,30 @@ const OPERATIONS_SECTIONS = [
             settings['monitor_setting.auto_test_channel_enabled'],
           'monitor_setting.auto_test_channel_minutes':
             settings['monitor_setting.auto_test_channel_minutes'],
+        }}
+      />
+    ),
+  },
+  {
+    id: 'lark-alerts',
+    titleKey: 'Feishu Alerts',
+    build: (settings: OperationsSettings) => (
+      <LarkNotifySettingsSection
+        defaultValues={{
+          'lark_notify_setting.enabled':
+            settings['lark_notify_setting.enabled'],
+          'lark_notify_setting.webhook_url':
+            settings['lark_notify_setting.webhook_url'],
+          'lark_notify_setting.sign_secret':
+            settings['lark_notify_setting.sign_secret'],
+          'lark_notify_setting.alert_on_relay_error':
+            settings['lark_notify_setting.alert_on_relay_error'],
+          'lark_notify_setting.alert_on_channel_test':
+            settings['lark_notify_setting.alert_on_channel_test'],
+          'lark_notify_setting.throttle_seconds':
+            settings['lark_notify_setting.throttle_seconds'],
+          'lark_notify_setting.use_card':
+            settings['lark_notify_setting.use_card'],
         }}
       />
     ),

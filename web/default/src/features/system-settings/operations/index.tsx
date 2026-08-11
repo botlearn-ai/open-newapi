@@ -40,6 +40,17 @@ const defaultOperationsSettings: OperationsSettings = {
     '100-199,300-399,401-407,409-499,500-503,505-523,525-599',
   'monitor_setting.auto_test_channel_enabled': false,
   'monitor_setting.auto_test_channel_minutes': 10,
+  // These must stay numerically/boolean-identical to the Go struct defaults in
+  // setting/operation_setting/lark_notify_setting.go, or a fresh install (no rows
+  // in `options` yet) shows a phantom unsaved diff.
+  'lark_notify_setting.enabled': false,
+  'lark_notify_setting.webhook_url': '',
+  // Always '' — GetOptions strips keys ending in "secret", same as SMTPToken below.
+  'lark_notify_setting.sign_secret': '',
+  'lark_notify_setting.alert_on_relay_error': true,
+  'lark_notify_setting.alert_on_channel_test': false,
+  'lark_notify_setting.throttle_seconds': 0,
+  'lark_notify_setting.use_card': true,
   SMTPServer: '',
   SMTPPort: '',
   SMTPAccount: '',

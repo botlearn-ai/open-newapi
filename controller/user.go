@@ -1148,6 +1148,8 @@ type UpdateUserSettingRequest struct {
 	GotifyUrl                        string  `json:"gotify_url,omitempty"`
 	GotifyToken                      string  `json:"gotify_token,omitempty"`
 	GotifyPriority                   int     `json:"gotify_priority,omitempty"`
+	LarkWebhookUrl                   string  `json:"lark_webhook_url,omitempty"`
+	LarkSignSecret                   string  `json:"lark_sign_secret,omitempty"`
 	UpstreamModelUpdateNotifyEnabled *bool   `json:"upstream_model_update_notify_enabled,omitempty"`
 	AcceptUnsetModelRatioModel       bool    `json:"accept_unset_model_ratio_model"`
 	RecordIpLog                      bool    `json:"record_ip_log"`
@@ -1161,7 +1163,7 @@ func UpdateUserSetting(c *gin.Context) {
 	}
 
 	// 验证预警类型
-	if req.QuotaWarningType != dto.NotifyTypeEmail && req.QuotaWarningType != dto.NotifyTypeWebhook && req.QuotaWarningType != dto.NotifyTypeBark && req.QuotaWarningType != dto.NotifyTypeGotify {
+	if req.QuotaWarningType != dto.NotifyTypeEmail && req.QuotaWarningType != dto.NotifyTypeWebhook && req.QuotaWarningType != dto.NotifyTypeBark && req.QuotaWarningType != dto.NotifyTypeGotify && req.QuotaWarningType != dto.NotifyTypeLark {
 		common.ApiErrorI18n(c, i18n.MsgSettingInvalidType)
 		return
 	}
@@ -1234,6 +1236,24 @@ func UpdateUserSetting(c *gin.Context) {
 		}
 	}
 
+	// 如果是飞书类型，验证 Webhook 地址
+	if req.QuotaWarningType == dto.NotifyTypeLark {
+		if req.LarkWebhookUrl == "" {
+			common.ApiErrorI18n(c, i18n.MsgSettingLarkWebhookEmpty)
+			return
+		}
+		// 验证URL格式
+		if _, err := url.ParseRequestURI(req.LarkWebhookUrl); err != nil {
+			common.ApiErrorI18n(c, i18n.MsgSettingLarkWebhookInvalid)
+			return
+		}
+		// 飞书群机器人 webhook 只有 HTTPS
+		if !strings.HasPrefix(req.LarkWebhookUrl, "https://") {
+			common.ApiErrorI18n(c, i18n.MsgSettingLarkWebhookInvalid)
+			return
+		}
+	}
+
 	userId := c.GetInt("id")
 	user, err := model.GetUserById(userId, true)
 	if err != nil {
@@ -1247,12 +1267,17 @@ func UpdateUserSetting(c *gin.Context) {
 	}
 
 	// 构建设置
+	// 注意：SetSetting 会整体覆盖 users.setting，因此这里必须显式携带本接口不涉及、
+	// 但由其它接口写入的字段，否则保存通知设置会把它们静默清空。
 	settings := dto.UserSetting{
 		NotifyType:                       req.QuotaWarningType,
 		QuotaWarningThreshold:            req.QuotaWarningThreshold,
 		UpstreamModelUpdateNotifyEnabled: upstreamModelUpdateNotifyEnabled,
 		AcceptUnsetRatioModel:            req.AcceptUnsetModelRatioModel,
 		RecordIpLog:                      req.RecordIpLog,
+		SidebarModules:                   existingSettings.SidebarModules,
+		BillingPreference:                existingSettings.BillingPreference,
+		Language:                         existingSettings.Language,
 	}
 
 	// 如果是webhook类型,添加webhook相关设置
@@ -1282,6 +1307,17 @@ func UpdateUserSetting(c *gin.Context) {
 			settings.GotifyPriority = 5
 		} else {
 			settings.GotifyPriority = req.GotifyPriority
+		}
+	}
+
+	// 如果是飞书类型，添加飞书配置到设置中
+	if req.QuotaWarningType == dto.NotifyTypeLark {
+		settings.LarkWebhookUrl = req.LarkWebhookUrl
+		// 留空表示沿用已存密钥（机器人未开签名校验时本就为空）
+		if req.LarkSignSecret != "" {
+			settings.LarkSignSecret = req.LarkSignSecret
+		} else {
+			settings.LarkSignSecret = existingSettings.LarkSignSecret
 		}
 	}
 

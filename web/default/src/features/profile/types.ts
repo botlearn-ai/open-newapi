@@ -86,7 +86,7 @@ export interface UserProfile {
 /**
  * Notification type
  */
-export type NotifyType = 'email' | 'webhook' | 'bark' | 'gotify'
+export type NotifyType = 'email' | 'webhook' | 'bark' | 'gotify' | 'lark'
 
 /**
  * Parsed user settings
@@ -110,6 +110,10 @@ export interface UserSettings {
   gotify_token?: string
   /** Gotify message priority (0-10) */
   gotify_priority?: number
+  /** Feishu custom group bot webhook URL */
+  lark_webhook_url?: string
+  /** Feishu signing secret (only when the bot enables signature verification) */
+  lark_sign_secret?: string
   /** Accept unset model ratio model */
   accept_unset_model_ratio_model?: boolean
   /** Record IP log */
@@ -142,6 +146,8 @@ export interface UpdateUserSettingsRequest {
   gotify_url?: string
   gotify_token?: string
   gotify_priority?: number
+  lark_webhook_url?: string
+  lark_sign_secret?: string
   accept_unset_model_ratio_model?: boolean
   record_ip_log?: boolean
   upstream_model_update_notify_enabled?: boolean
