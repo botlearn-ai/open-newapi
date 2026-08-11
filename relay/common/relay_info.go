@@ -662,6 +662,19 @@ func (info *RelayInfo) SetFirstResponseTime() {
 	}
 }
 
+// ResetStreamAttemptState resets fields that describe a single upstream stream
+// attempt. RelayInfo is reused when the controller retries another channel.
+func (info *RelayInfo) ResetStreamAttemptState() {
+	if info == nil {
+		return
+	}
+	info.FirstResponseTime = time.Time{}
+	info.isFirstResponse = true
+	info.SendResponseCount = 0
+	info.ReceivedResponseCount = 0
+	info.StreamStatus = nil
+}
+
 func (info *RelayInfo) HasSendResponse() bool {
 	return info.FirstResponseTime.After(info.StartTime)
 }

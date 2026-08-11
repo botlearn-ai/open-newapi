@@ -50,6 +50,7 @@ func TestStreamStatus_SetEndReason_Concurrent(t *testing.T) {
 		StreamEndReasonEOF,
 		StreamEndReasonPanic,
 		StreamEndReasonPingFail,
+		StreamEndReasonIncomplete,
 	}
 
 	var wg sync.WaitGroup
@@ -128,6 +129,22 @@ func TestStreamStatus_HasErrors_NilSafe(t *testing.T) {
 	assert.Equal(t, 0, s.TotalErrorCount())
 }
 
+func TestStreamStatus_Terminal(t *testing.T) {
+	t.Parallel()
+	s := NewStreamStatus()
+
+	assert.False(t, s.HasTerminal())
+	s.MarkTerminal()
+	assert.True(t, s.HasTerminal())
+}
+
+func TestStreamStatus_Terminal_NilSafe(t *testing.T) {
+	t.Parallel()
+	var s *StreamStatus
+	s.MarkTerminal()
+	assert.False(t, s.HasTerminal())
+}
+
 func TestStreamStatus_IsNormalEnd(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -142,6 +159,7 @@ func TestStreamStatus_IsNormalEnd(t *testing.T) {
 		{StreamEndReasonScannerErr, false},
 		{StreamEndReasonPanic, false},
 		{StreamEndReasonPingFail, false},
+		{StreamEndReasonIncomplete, false},
 		{StreamEndReasonNone, false},
 	}
 	for _, tt := range tests {

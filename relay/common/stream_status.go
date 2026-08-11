@@ -1,11 +1,14 @@
 package common
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
 	"time"
 )
+
+var ErrUpstreamStreamIncomplete = errors.New("upstream stream ended before terminal event")
 
 type StreamEndReason string
 
@@ -19,6 +22,7 @@ const (
 	StreamEndReasonEOF         StreamEndReason = "eof"
 	StreamEndReasonPanic       StreamEndReason = "panic"
 	StreamEndReasonPingFail    StreamEndReason = "ping_fail"
+	StreamEndReasonIncomplete  StreamEndReason = "incomplete"
 )
 
 const maxStreamErrorEntries = 20
@@ -29,13 +33,32 @@ type StreamErrorEntry struct {
 }
 
 type StreamStatus struct {
-	EndReason  StreamEndReason
-	EndError   error
-	endOnce    sync.Once
+	EndReason StreamEndReason
+	EndError  error
+	endOnce   sync.Once
 
 	mu         sync.Mutex
 	Errors     []StreamErrorEntry
 	ErrorCount int
+	terminal   bool
+}
+
+func (s *StreamStatus) MarkTerminal() {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	s.terminal = true
+	s.mu.Unlock()
+}
+
+func (s *StreamStatus) HasTerminal() bool {
+	if s == nil {
+		return false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.terminal
 }
 
 func NewStreamStatus() *StreamStatus {

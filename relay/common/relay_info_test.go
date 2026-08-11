@@ -2,10 +2,33 @@ package common
 
 import (
 	"testing"
+	"time"
 
 	"github.com/QuantumNous/new-api/types"
 	"github.com/stretchr/testify/require"
 )
+
+func TestRelayInfoResetStreamAttemptState(t *testing.T) {
+	info := &RelayInfo{
+		StartTime:             time.Now().Add(-time.Second),
+		FirstResponseTime:     time.Now(),
+		isFirstResponse:       false,
+		SendResponseCount:     2,
+		ReceivedResponseCount: 3,
+		StreamStatus:          NewStreamStatus(),
+	}
+
+	info.ResetStreamAttemptState()
+
+	require.True(t, info.FirstResponseTime.IsZero())
+	require.True(t, info.isFirstResponse)
+	require.Zero(t, info.SendResponseCount)
+	require.Zero(t, info.ReceivedResponseCount)
+	require.Nil(t, info.StreamStatus)
+
+	info.SetFirstResponseTime()
+	require.False(t, info.FirstResponseTime.IsZero())
+}
 
 func TestRelayInfoGetFinalRequestRelayFormatPrefersExplicitFinal(t *testing.T) {
 	info := &RelayInfo{
