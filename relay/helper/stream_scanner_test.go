@@ -469,6 +469,53 @@ func TestStreamScannerHandler_StreamStatus_EOFWithoutDone(t *testing.T) {
 	assert.True(t, info.StreamStatus.IsNormalEnd())
 }
 
+func TestStreamScannerHandler_StreamStatus_StrictEOFWithoutTerminal(t *testing.T) {
+	t.Parallel()
+
+	body := "data: {\"choices\":[{\"delta\":{\"content\":\"partial\"}}]}\n"
+	c, resp, info := setupStreamTest(t, strings.NewReader(body))
+
+	StreamScannerHandler(c, resp, info, func(data string, sr *StreamResult) {}, func(data string) bool {
+		return strings.Contains(data, `"finish_reason":"stop"`)
+	})
+
+	require.NotNil(t, info.StreamStatus)
+	assert.Equal(t, relaycommon.StreamEndReasonIncomplete, info.StreamStatus.EndReason)
+	assert.ErrorIs(t, info.StreamStatus.EndError, relaycommon.ErrUpstreamStreamIncomplete)
+	assert.False(t, info.StreamStatus.IsNormalEnd())
+	assert.False(t, info.StreamStatus.HasTerminal())
+}
+
+func TestStreamScannerHandler_StreamStatus_StrictEOFAfterTerminal(t *testing.T) {
+	t.Parallel()
+
+	body := "data: {\"choices\":[{\"finish_reason\":\"stop\"}]}\n"
+	c, resp, info := setupStreamTest(t, strings.NewReader(body))
+
+	StreamScannerHandler(c, resp, info, func(data string, sr *StreamResult) {}, func(data string) bool {
+		return strings.Contains(data, `"finish_reason":"stop"`)
+	})
+
+	require.NotNil(t, info.StreamStatus)
+	assert.Equal(t, relaycommon.StreamEndReasonEOF, info.StreamStatus.EndReason)
+	assert.True(t, info.StreamStatus.IsNormalEnd())
+	assert.True(t, info.StreamStatus.HasTerminal())
+}
+
+func TestStreamScannerHandler_StreamStatus_DoneMarksTerminal(t *testing.T) {
+	t.Parallel()
+
+	c, resp, info := setupStreamTest(t, strings.NewReader("data: [DONE]\n"))
+
+	StreamScannerHandler(c, resp, info, func(data string, sr *StreamResult) {}, func(data string) bool {
+		return false
+	})
+
+	require.NotNil(t, info.StreamStatus)
+	assert.Equal(t, relaycommon.StreamEndReasonDone, info.StreamStatus.EndReason)
+	assert.True(t, info.StreamStatus.HasTerminal())
+}
+
 func TestStreamScannerHandler_StreamStatus_HandlerStop(t *testing.T) {
 	t.Parallel()
 

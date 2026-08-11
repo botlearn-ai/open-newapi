@@ -109,6 +109,32 @@ func processTokenData(relayMode int, data string, responseTextBuilder *strings.B
 	return nil
 }
 
+func isOpenAIStreamTerminal(relayMode int, data string) bool {
+	switch relayMode {
+	case relayconstant.RelayModeChatCompletions:
+		var streamResponse dto.ChatCompletionsStreamResponse
+		if err := common.UnmarshalJsonStr(data, &streamResponse); err != nil {
+			return false
+		}
+		for _, choice := range streamResponse.Choices {
+			if choice.FinishReason != nil && *choice.FinishReason != "" {
+				return true
+			}
+		}
+	case relayconstant.RelayModeCompletions:
+		var streamResponse dto.CompletionsStreamResponse
+		if err := common.UnmarshalJsonStr(data, &streamResponse); err != nil {
+			return false
+		}
+		for _, choice := range streamResponse.Choices {
+			if choice.FinishReason != "" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func processCompletionsStreamResponse(streamResponse dto.CompletionsStreamResponse, responseTextBuilder *strings.Builder) {
 	for _, choice := range streamResponse.Choices {
 		responseTextBuilder.WriteString(choice.Text)

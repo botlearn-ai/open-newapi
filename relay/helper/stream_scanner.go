@@ -27,6 +27,8 @@ const (
 	DefaultPingInterval         = 10 * time.Second
 )
 
+type StreamTerminalDetector func(data string) bool
+
 func getScannerBufferSize() int {
 	if constant.StreamScannerMaxBufferMB > 0 {
 		return constant.StreamScannerMaxBufferMB << 20
@@ -34,7 +36,7 @@ func getScannerBufferSize() int {
 	return DefaultMaxScannerBufferSize
 }
 
-func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon.RelayInfo, dataHandler func(data string, sr *StreamResult)) {
+func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon.RelayInfo, dataHandler func(data string, sr *StreamResult), terminalDetectors ...StreamTerminalDetector) {
 
 	if resp == nil || dataHandler == nil {
 		return
@@ -42,6 +44,13 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 
 	// 无条件新建 StreamStatus
 	info.StreamStatus = relaycommon.NewStreamStatus()
+	hasTerminalDetector := false
+	for _, detector := range terminalDetectors {
+		if detector != nil {
+			hasTerminalDetector = true
+			break
+		}
+	}
 
 	// 确保响应体总是被关闭
 	defer func() {
@@ -101,7 +110,10 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 			logger.LogError(c, "timeout waiting for goroutines to exit")
 		}
 
-		close(stopChan)
+		// Do not close stopChan. Worker defers may still signal it after Done is
+		// observed (and the timeout branch can leave a worker running), so closing
+		// here creates a send/close race. The request-local channel is reclaimed
+		// once the workers exit.
 	}()
 
 	scanner.Buffer(make([]byte, InitialScannerBufferSize), getScannerBufferSize())
@@ -244,6 +256,12 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 			if !strings.HasPrefix(data, "[DONE]") {
 				info.SetFirstResponseTime()
 				info.ReceivedResponseCount++
+				for _, detector := range terminalDetectors {
+					if detector != nil && detector(data) {
+						info.StreamStatus.MarkTerminal()
+						break
+					}
+				}
 
 				select {
 				case dataChan <- data:
@@ -253,6 +271,7 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 					return
 				}
 			} else {
+				info.StreamStatus.MarkTerminal()
 				info.StreamStatus.SetEndReason(relaycommon.StreamEndReasonDone, nil)
 				logger.LogDebug(c, "received [DONE], stopping scanner")
 				return
@@ -265,7 +284,11 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 				info.StreamStatus.SetEndReason(relaycommon.StreamEndReasonScannerErr, err)
 			}
 		}
-		info.StreamStatus.SetEndReason(relaycommon.StreamEndReasonEOF, nil)
+		if hasTerminalDetector && !info.StreamStatus.HasTerminal() {
+			info.StreamStatus.SetEndReason(relaycommon.StreamEndReasonIncomplete, relaycommon.ErrUpstreamStreamIncomplete)
+		} else {
+			info.StreamStatus.SetEndReason(relaycommon.StreamEndReasonEOF, nil)
+		}
 	})
 
 	// 主循环等待完成或超时
