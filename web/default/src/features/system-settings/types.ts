@@ -282,6 +282,15 @@ export type OperationsSettings = {
   AutomaticRetryStatusCodes: string
   'monitor_setting.auto_test_channel_enabled': boolean
   'monitor_setting.auto_test_channel_minutes': number
+  'lark_notify_setting.enabled': boolean
+  'lark_notify_setting.webhook_url': string
+  // Never populated by the API: GetOptions strips keys ending in "secret".
+  // Kept here so the key is documented, same as SMTPToken below.
+  'lark_notify_setting.sign_secret': string
+  'lark_notify_setting.alert_on_relay_error': boolean
+  'lark_notify_setting.alert_on_channel_test': boolean
+  'lark_notify_setting.throttle_seconds': number
+  'lark_notify_setting.use_card': boolean
   SMTPServer: string
   SMTPPort: string
   SMTPAccount: string

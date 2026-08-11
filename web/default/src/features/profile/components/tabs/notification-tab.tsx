@@ -17,7 +17,14 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useState, useEffect, useCallback } from 'react'
-import { Bell, Loader2, Mail, Server, Webhook } from 'lucide-react'
+import {
+  Bell,
+  Loader2,
+  Mail,
+  MessageSquare,
+  Server,
+  Webhook,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { ROLE } from '@/lib/roles'
@@ -35,11 +42,14 @@ import {
 import { parseUserSettings } from '../../lib'
 import type { UserProfile, UserSettings, NotifyType } from '../../types'
 
+// Every value in NOTIFICATION_METHODS must have an entry here: the lookup below
+// is rendered directly as <Icon />, so a missing key is a hard render crash.
 const NOTIFICATION_ICONS: Record<string, typeof Mail> = {
   email: Mail,
   webhook: Webhook,
   bark: Bell,
   gotify: Server,
+  lark: MessageSquare,
 }
 
 // ============================================================================
@@ -65,6 +75,8 @@ export function NotificationTab({ profile, onUpdate }: NotificationTabProps) {
     gotify_url: '',
     gotify_token: '',
     gotify_priority: 5,
+    lark_webhook_url: '',
+    lark_sign_secret: '',
     accept_unset_model_ratio_model: false,
     record_ip_log: false,
     upstream_model_update_notify_enabled: false,
@@ -92,6 +104,8 @@ export function NotificationTab({ profile, onUpdate }: NotificationTabProps) {
         gotify_url: parsed.gotify_url ?? '',
         gotify_token: parsed.gotify_token ?? '',
         gotify_priority: parsed.gotify_priority ?? 5,
+        lark_webhook_url: parsed.lark_webhook_url ?? '',
+        lark_sign_secret: parsed.lark_sign_secret ?? '',
         accept_unset_model_ratio_model:
           parsed.accept_unset_model_ratio_model || false,
         record_ip_log: parsed.record_ip_log || false,
@@ -129,7 +143,7 @@ export function NotificationTab({ profile, onUpdate }: NotificationTabProps) {
           onValueChange={(value) =>
             updateField('notify_type', value as NotifyType)
           }
-          className='grid grid-cols-4 gap-1.5 sm:gap-3'
+          className='grid grid-cols-3 gap-1.5 sm:grid-cols-5 sm:gap-3'
         >
           {NOTIFICATION_METHODS.map((method) => {
             const Icon = NOTIFICATION_ICONS[method.value]
@@ -305,6 +319,60 @@ export function NotificationTab({ profile, onUpdate }: NotificationTabProps) {
                 {t('Gotify Documentation')}
               </a>
             </p>
+          </div>
+        </>
+      )}
+
+      {/* Feishu Settings */}
+      {settings.notify_type === 'lark' && (
+        <>
+          <div className='space-y-1.5'>
+            <Label htmlFor='larkWebhookUrl'>{t('Feishu Webhook URL')}</Label>
+            <Input
+              id='larkWebhookUrl'
+              type='url'
+              className='h-9'
+              value={settings.lark_webhook_url}
+              onChange={(e) => updateField('lark_webhook_url', e.target.value)}
+              placeholder='https://open.feishu.cn/open-apis/bot/v2/hook/xxxxxxxx'
+            />
+            <p className='text-muted-foreground text-xs'>
+              {t('Webhook address of the Feishu group custom bot')}
+            </p>
+          </div>
+          <div className='space-y-1.5'>
+            <Label htmlFor='larkSignSecret'>
+              {t('Feishu Signing Secret')}
+            </Label>
+            <PasswordInput
+              id='larkSignSecret'
+              value={settings.lark_sign_secret}
+              onChange={(e) => updateField('lark_sign_secret', e.target.value)}
+              placeholder={t('Enter signing secret (optional)')}
+            />
+            <p className='text-muted-foreground text-xs'>
+              {t(
+                'Only required when signature verification is enabled for your bot'
+              )}
+            </p>
+          </div>
+          <div className='bg-muted/50 rounded-lg border p-3 sm:p-4'>
+            <h5 className='mb-1.5 text-sm font-medium sm:mb-2'>
+              {t('Setup Instructions')}
+            </h5>
+            <ol className='text-muted-foreground space-y-1 text-xs'>
+              <li>
+                {t(
+                  '1. Open the target Feishu group and go to Settings > Group Bots'
+                )}
+              </li>
+              <li>{t('2. Add a Custom Bot and copy its webhook URL')}</li>
+              <li>
+                {t(
+                  '3. Paste the URL above, and the signing secret if you enabled signing'
+                )}
+              </li>
+            </ol>
           </div>
         </>
       )}

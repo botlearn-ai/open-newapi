@@ -60,6 +60,23 @@ export async function resetModelRatios() {
   return res.data
 }
 
+export async function testLarkNotify(payload: {
+  webhook_url: string
+  sign_secret?: string
+}) {
+  // skipErrorHandler: the section renders its own result Alert; without this the
+  // global axios interceptor fires a duplicate toast for the same failure.
+  const config = { skipErrorHandler: true } as unknown as Parameters<
+    typeof api.post
+  >[2]
+  const res = await api.post<UpdateOptionResponse>(
+    '/api/option/lark_notify/test',
+    payload,
+    config
+  )
+  return res.data
+}
+
 export async function getUpstreamChannels() {
   const res = await api.get<UpstreamChannelsResponse>(
     '/api/ratio_sync/channels'
