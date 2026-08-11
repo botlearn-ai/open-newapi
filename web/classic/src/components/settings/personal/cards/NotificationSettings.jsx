@@ -432,6 +432,7 @@ const NotificationSettings = ({
                   <Radio value='webhook'>{t('Webhook通知')}</Radio>
                   <Radio value='bark'>{t('Bark通知')}</Radio>
                   <Radio value='gotify'>{t('Gotify通知')}</Radio>
+                  <Radio value='lark'>{t('飞书通知')}</Radio>
                 </Form.RadioGroup>
 
                 <Form.AutoComplete
@@ -738,6 +739,80 @@ const NotificationSettings = ({
                             className='text-blue-500 hover:text-blue-600 font-medium'
                           >
                             Gotify {t('官方文档')}
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* 飞书推送设置 */}
+                {notificationSettings.warningType === 'lark' && (
+                  <>
+                    <Form.Input
+                      field='larkWebhookUrl'
+                      label={t('飞书 Webhook 地址')}
+                      placeholder='https://open.feishu.cn/open-apis/bot/v2/hook/xxxxxxxx'
+                      onChange={(val) =>
+                        handleFormChange('larkWebhookUrl', val)
+                      }
+                      prefix={<IconLink />}
+                      extraText={t('飞书群自定义机器人的 Webhook 地址')}
+                      showClear
+                      rules={[
+                        {
+                          required: notificationSettings.warningType === 'lark',
+                          message: t('请输入飞书 Webhook 地址'),
+                        },
+                        {
+                          // 飞书群机器人只有 HTTPS，后端也是这么校验的
+                          pattern: /^https:\/\/.+/,
+                          message: t('飞书 Webhook 地址必须以 https:// 开头'),
+                        },
+                      ]}
+                    />
+
+                    <Form.Input
+                      field='larkSignSecret'
+                      label={t('飞书签名密钥')}
+                      mode='password'
+                      placeholder={t('输入签名密钥（可选）')}
+                      onChange={(val) =>
+                        handleFormChange('larkSignSecret', val)
+                      }
+                      prefix={<IconKey />}
+                      extraText={t('仅当你的机器人开启了签名校验时才需要')}
+                      showClear
+                    />
+
+                    <div className='mt-3 p-4 bg-gray-50/50 rounded-xl'>
+                      <div className='text-sm text-gray-700 mb-3'>
+                        <strong>{t('配置说明')}</strong>
+                      </div>
+                      <div className='text-xs text-gray-500 space-y-2'>
+                        <div>
+                          1. {t('打开目标飞书群，进入 设置 > 群机器人')}
+                        </div>
+                        <div>
+                          2. {t('添加自定义机器人并复制其 Webhook 地址')}
+                        </div>
+                        <div>
+                          3.{' '}
+                          {t(
+                            '把地址填到上方；若开启了签名校验，同时填入密钥',
+                          )}
+                        </div>
+                        <div className='mt-3 pt-3 border-t border-gray-200'>
+                          <span className='text-gray-400'>
+                            {t('更多信息请参考')}
+                          </span>{' '}
+                          <a
+                            href='https://open.feishu.cn/document/client-docs/bot-v3/add-custom-bot'
+                            target='_blank'
+                            rel='noopener noreferrer'
+                            className='text-blue-500 hover:text-blue-600 font-medium'
+                          >
+                            {t('飞书')} {t('官方文档')}
                           </a>
                         </div>
                       </div>
