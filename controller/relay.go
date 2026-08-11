@@ -228,7 +228,7 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		newAPIError = service.NormalizeViolationFeeError(newAPIError)
 		relayInfo.LastError = newAPIError
 
-		processChannelError(c, *types.NewChannelError(channel.Id, channel.Type, channel.Name, channel.ChannelInfo.IsMultiKey, common.GetContextKeyString(c, constant.ContextKeyChannelKey), channel.GetAutoBan()), newAPIError)
+		processChannelError(c, *types.NewChannelError(channel.Id, channel.Type, channel.Name, channel.ChannelInfo.IsMultiKey, common.GetContextKeyString(c, constant.ContextKeyChannelKey), channel.GetAutoBan()), newAPIError, service.FailureAlertSourceRelay)
 
 		if !shouldRetry(c, newAPIError, common.RetryTimes-retryParam.GetRetry()) {
 			break
@@ -353,7 +353,7 @@ func shouldRetry(c *gin.Context, openaiErr *types.NewAPIError, retryTimes int) b
 	return operation_setting.ShouldRetryByStatusCode(code)
 }
 
-func processChannelError(c *gin.Context, channelError types.ChannelError, err *types.NewAPIError) {
+func processChannelError(c *gin.Context, channelError types.ChannelError, err *types.NewAPIError, source string) {
 	logger.LogError(c, fmt.Sprintf("channel error (channel #%d, status code: %d): %s", channelError.ChannelId, err.StatusCode, common.LocalLogPreview(err.Error())))
 	// 不要使用context获取渠道信息，异步处理时可能会出现渠道信息不一致的情况
 	// do not use context to get channel info, there may be inconsistent channel info when processing asynchronously
@@ -398,6 +398,36 @@ func processChannelError(c *gin.Context, channelError types.ChannelError, err *t
 		model.RecordErrorLog(c, userId, channelId, modelName, tokenName, err.MaskSensitiveErrorWithStatusCode(), tokenId, useTimeSeconds, common.GetContextKeyBool(c, constant.ContextKeyIsStream), userGroup, other)
 	}
 
+	// 失败告警（飞书）。先做开关判断再构造载荷，避免关闭时白白构造结构体。
+	if service.ShouldAlertFailure(source) {
+		requestPath := ""
+		if c.Request != nil && c.Request.URL != nil {
+			requestPath = c.Request.URL.Path
+		}
+		// addUsedChannel 每次尝试追加一个渠道，所以它的长度就是当前尝试序号
+		attemptIndex := len(c.GetStringSlice("use_channel")) - 1
+		if attemptIndex < 0 {
+			attemptIndex = 0
+		}
+		service.AlertLLMFailure(service.FailureAlert{
+			ChannelId:   channelError.ChannelId,
+			ChannelType: channelError.ChannelType,
+			ChannelName: channelError.ChannelName,
+			UserId:      c.GetInt("id"),
+			StatusCode:  err.StatusCode,
+			RetryIndex:  attemptIndex,
+			ModelName:   c.GetString("original_model"),
+			ErrorType:   string(err.GetErrorType()),
+			ErrorCode:   fmt.Sprintf("%v", err.GetErrorCode()),
+			Message:     err.MaskSensitiveErrorWithStatusCode(),
+			TokenName:   c.GetString("token_name"),
+			Group:       c.GetString("group"),
+			RequestPath: requestPath,
+			Source:      source,
+			IsMultiKey:  channelError.IsMultiKey,
+			OccurredAt:  time.Now(),
+		})
+	}
 }
 
 func RelayMidjourney(c *gin.Context) {
@@ -555,7 +585,8 @@ func RelayTask(c *gin.Context) {
 			processChannelError(c,
 				*types.NewChannelError(channel.Id, channel.Type, channel.Name, channel.ChannelInfo.IsMultiKey,
 					common.GetContextKeyString(c, constant.ContextKeyChannelKey), channel.GetAutoBan()),
-				types.NewOpenAIError(taskErr.Error, types.ErrorCodeBadResponseStatusCode, taskErr.StatusCode))
+				types.NewOpenAIError(taskErr.Error, types.ErrorCodeBadResponseStatusCode, taskErr.StatusCode),
+				service.FailureAlertSourceRelay)
 		}
 
 		if !shouldRetryTaskRelay(c, channel.Id, taskErr, common.RetryTimes-retryParam.GetRetry()) {
