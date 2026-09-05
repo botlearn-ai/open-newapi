@@ -39,6 +39,14 @@ jobs:
       - name: Check out
         uses: actions/checkout@v4
 
+      - name: Isolate Docker authentication
+        shell: bash
+        run: |
+          docker_config="$(mktemp -d "$RUNNER_TEMP/prod-docker-config.XXXXXX")"
+          chmod 700 "$docker_config"
+          printf '%s\n' '{"auths":{}}' > "$docker_config/config.json"
+          echo "DOCKER_CONFIG=$docker_config" >> "$GITHUB_ENV"
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
