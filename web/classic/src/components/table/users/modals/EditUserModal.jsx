@@ -66,6 +66,7 @@ const EditUserModal = (props) => {
   const userId = props.editingUser.id;
   const [loading, setLoading] = useState(true);
   const [adjustModalOpen, setAdjustModalOpen] = useState(false);
+  const [usdTopUp, setUsdTopUp] = useState(false);
   const [integrationTokensVisible, setIntegrationTokensVisible] =
     useState(false);
   const [adjustQuotaLocal, setAdjustQuotaLocal] = useState('');
@@ -401,9 +402,21 @@ const EditUserModal = (props) => {
                       <Col span={24}>
                         <Button
                           icon={<IconEdit />}
-                          onClick={() => setIntegrationTokensVisible(true)}
+                          onClick={() => {
+                            setUsdTopUp(false);
+                            setIntegrationTokensVisible(true);
+                          }}
                         >
                           {t('Integration token quota')}
+                        </Button>
+                        <Button
+                          onClick={() => {
+                            setUsdTopUp(true);
+                            setIntegrationTokensVisible(true);
+                          }}
+                          style={{ marginLeft: 8 }}
+                        >
+                          {t('Top up user and token (USD)')}
                         </Button>
                       </Col>
 
@@ -473,7 +486,8 @@ const EditUserModal = (props) => {
 
       {userId && (
         <UserIntegrationTokensModal
-          key={userId}
+          key={`${userId}:${usdTopUp}`}
+          topUp={usdTopUp}
           userId={userId}
           visible={integrationTokensVisible}
           onCancel={() => setIntegrationTokensVisible(false)}

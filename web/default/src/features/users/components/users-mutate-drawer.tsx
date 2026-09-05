@@ -92,6 +92,7 @@ export function UsersMutateDrawer({
   const { triggerRefresh } = useUsers()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [quotaDialogOpen, setQuotaDialogOpen] = useState(false)
+  const [usdTopUp, setUsdTopUp] = useState(false)
   const [integrationTokensOpen, setIntegrationTokensOpen] = useState(false)
 
   // Fetch groups
@@ -400,9 +401,22 @@ export function UsersMutateDrawer({
                   <Button
                     type='button'
                     variant='outline'
-                    onClick={() => setIntegrationTokensOpen(true)}
+                    onClick={() => {
+                      setUsdTopUp(false)
+                      setIntegrationTokensOpen(true)
+                    }}
                   >
                     {t('Integration token quota')}
+                  </Button>
+                  <Button
+                    type='button'
+                    variant='outline'
+                    onClick={() => {
+                      setUsdTopUp(true)
+                      setIntegrationTokensOpen(true)
+                    }}
+                  >
+                    {t('Top up user and token (USD)')}
                   </Button>
 
                   <FormField
@@ -472,7 +486,8 @@ export function UsersMutateDrawer({
 
       {currentRow && (
         <UserIntegrationTokensDialog
-          key={currentRow.id}
+          key={`${currentRow.id}:${usdTopUp}`}
+          topUp={usdTopUp}
           open={integrationTokensOpen}
           onOpenChange={setIntegrationTokensOpen}
           userId={currentRow.id}

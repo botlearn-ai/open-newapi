@@ -3875,6 +3875,11 @@
     "No linked integration tokens": "No linked integration tokens",
     "Failed to load integration tokens": "Failed to load integration tokens",
     "Failed to add token quota. Retry with the same amount to avoid duplicate credit.": "Failed to add token quota. Retry with the same amount to avoid duplicate credit.",
-    "已用尽": "Exhausted"
+    "已用尽": "Exhausted",
+    "Top up user and token (USD)": "Top up user and token (USD)",
+    "Add the entered USD amount to both the user balance and the selected integration token.": "Add the entered USD amount to both the user balance and the selected integration token.",
+    "Confirm USD top-up": "Confirm USD top-up",
+    "USD top-up successful": "USD top-up successful",
+    "Top-up failed. Retry with the same amount to avoid duplicate credit.": "Top-up failed. Retry with the same amount to avoid duplicate credit."
   }
 }

@@ -70,3 +70,32 @@ func AdminAddIntegrationTokenQuota(c *gin.Context) {
 	}
 	common.ApiSuccess(c, gin.H{"replayed": replayed})
 }
+
+// AdminTopUpIntegration credits both balances using an explicit USD amount.
+func AdminTopUpIntegration(c *gin.Context) {
+	user, ok := adminIntegrationTarget(c)
+	if !ok {
+		return
+	}
+	tokenId, err := strconv.Atoi(c.Param("token_id"))
+	if err != nil || tokenId <= 0 {
+		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+		return
+	}
+	var req struct {
+		AmountUSD float64 `json:"amount_usd"`
+	}
+	if err := common.DecodeJson(c.Request.Body, &req); err != nil {
+		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+		return
+	}
+	replayed, err := service.AddAdminIntegrationUSD(c.GetInt("id"), user.Id, tokenId, req.AmountUSD, c.GetHeader("Idempotency-Key"))
+	if err != nil {
+		writeIntegrationError(c, err)
+		return
+	}
+	if !replayed {
+		model.RecordLogWithAdminInfo(user.Id, model.LogTypeManage, fmt.Sprintf("管理员充值集成账户及令牌 #%d USD %.6f", tokenId, req.AmountUSD), map[string]interface{}{"admin_id": c.GetInt("id"), "admin_username": c.GetString("username"), "token_id": tokenId, "amount_usd": req.AmountUSD})
+	}
+	common.ApiSuccess(c, gin.H{"replayed": replayed})
+}

@@ -1779,7 +1779,7 @@
     "footer.columns.related.links.oneApi": "One API",
     "footer.columns.related.title": "Related Projects",
     "footer.defaultCopyright": "All rights reserved.",
-    "footer.new\u0061pi.projectAttributionSuffix": "All rights reserved. Designed and developed by the project contributors.",
+    "footer.newapi.projectAttributionSuffix": "All rights reserved. Designed and developed by the project contributors.",
     "For channels added after May 10, 2025, no need to remove \".\" from model names during deployment": "For channels added after May 10, 2025, no need to remove \".\" from model names during deployment",
     "For private deployments, format: https://fastgpt.run/api/openapi": "For private deployments, format: https://fastgpt.run/api/openapi",
     "Force a syntactically valid JSON response": "Force a syntactically valid JSON response",
@@ -4570,6 +4570,11 @@
     "Only required when signature verification is enabled for your bot": "Only required when signature verification is enabled for your bot",
     "1. Open the target Feishu group and go to Settings > Group Bots": "1. Open the target Feishu group and go to Settings > Group Bots",
     "2. Add a Custom Bot and copy its webhook URL": "2. Add a Custom Bot and copy its webhook URL",
-    "3. Paste the URL above, and the signing secret if you enabled signing": "3. Paste the URL above, and the signing secret if you enabled signing"
+    "3. Paste the URL above, and the signing secret if you enabled signing": "3. Paste the URL above, and the signing secret if you enabled signing",
+    "Top up user and token (USD)": "Top up user and token (USD)",
+    "Add the entered USD amount to both the user balance and the selected integration token.": "Add the entered USD amount to both the user balance and the selected integration token.",
+    "Confirm USD top-up": "Confirm USD top-up",
+    "USD top-up successful": "USD top-up successful",
+    "Top-up failed. Retry with the same amount to avoid duplicate credit.": "Top-up failed. Retry with the same amount to avoid duplicate credit."
   }
 }

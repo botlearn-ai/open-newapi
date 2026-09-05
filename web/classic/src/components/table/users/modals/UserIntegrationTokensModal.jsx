@@ -31,7 +31,7 @@ import {
 import {
   API,
   getCurrencyConfig,
-  renderQuota,
+  renderQuota as renderDisplayQuota,
   showError,
   showSuccess,
 } from '../../../../helpers';
@@ -43,6 +43,10 @@ import { useIsMobile } from '../../../../hooks/common/useIsMobile';
 
 const UserIntegrationTokensModal = (props) => {
   const { t } = useTranslation();
+  const renderQuota = (value, digits) =>
+    props.topUp
+      ? `USD ${(value / getQuotaPerUnit()).toFixed(6)}`
+      : renderDisplayQuota(value, digits);
   const isMobile = useIsMobile();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -86,13 +90,17 @@ const UserIntegrationTokensModal = (props) => {
   }, [props.visible, props.userId, load]);
 
   const token = data?.tokens.find((item) => item.token_id === tokenId);
-  const quota = displayAmountToQuota(amount);
+  const quota = props.topUp
+    ? Math.round(Number(amount) * getQuotaPerUnit())
+    : displayAmountToQuota(amount);
   const valid =
     Number(amount) > 0 &&
     Number.isSafeInteger(quota) &&
     quota > 0 &&
     quota <= 1e9 * getQuotaPerUnit();
-  const currency = getCurrencyConfig();
+  const currency = props.topUp
+    ? { type: 'USD', symbol: '$' }
+    : getCurrencyConfig();
   let status = t('未知');
   if (token?.status === 1) status = t('已启用');
   if (token?.status === 2) status = t('已禁用');
@@ -114,19 +122,27 @@ const UserIntegrationTokensModal = (props) => {
       requests.current.set(requestId, crypto.randomUUID());
     try {
       const res = await API.post(
-        `/api/user/${props.userId}/integration-tokens/${token.token_id}/quota`,
-        { quota },
+        `/api/user/${props.userId}/integration-tokens/${token.token_id}/${props.topUp ? 'topup' : 'quota'}`,
+        props.topUp ? { amount_usd: Number(amount) } : { quota },
         { headers: { 'Idempotency-Key': requests.current.get(requestId) } },
       );
       if (!res.data.success) throw new Error(res.data.message);
       requests.current.delete(requestId);
       setAmount('');
-      showSuccess(t('Token quota added successfully'));
+      showSuccess(
+        t(
+          props.topUp
+            ? 'USD top-up successful'
+            : 'Token quota added successfully',
+        ),
+      );
       await load();
     } catch {
       showError(
         t(
-          'Failed to add token quota. Retry with the same amount to avoid duplicate credit.',
+          props.topUp
+            ? 'Top-up failed. Retry with the same amount to avoid duplicate credit.'
+            : 'Failed to add token quota. Retry with the same amount to avoid duplicate credit.',
         ),
       );
     } finally {
@@ -137,7 +153,7 @@ const UserIntegrationTokensModal = (props) => {
 
   return (
     <Modal
-      title={`${t('Integration token quota')} · #${props.userId}`}
+      title={`${t(props.topUp ? 'Top up user and token (USD)' : 'Integration token quota')} · #${props.userId}`}
       visible={props.visible}
       onCancel={() => {
         if (!submitting) props.onCancel();
@@ -152,7 +168,9 @@ const UserIntegrationTokensModal = (props) => {
       <Space vertical align='start' spacing={16} style={{ width: '100%' }}>
         <Typography.Text type='secondary'>
           {t(
-            'Add quota only to the selected token. The user balance and used quota will not change.',
+            props.topUp
+              ? 'Add the entered USD amount to both the user balance and the selected integration token.'
+              : 'Add quota only to the selected token. The user balance and used quota will not change.',
           )}
         </Typography.Text>
         {loading && <Spin />}
@@ -233,7 +251,11 @@ const UserIntegrationTokensModal = (props) => {
                       disabled={!valid || loading}
                       onClick={submit}
                     >
-                      {t('Confirm token quota increase')}
+                      {t(
+                        props.topUp
+                          ? 'Confirm USD top-up'
+                          : 'Confirm token quota increase',
+                      )}
                     </Button>
                   </>
                 )}
