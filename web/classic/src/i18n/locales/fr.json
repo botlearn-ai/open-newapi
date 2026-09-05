@@ -3679,6 +3679,17 @@
     "并确认自行承担部署": "confirm that I bear legal responsibility arising from deployment",
     "运营和收费行为产生的法律责任": "operation and charging behavior",
     "，": ", ",
-    "、": ", "
+    "、": ", ",
+    "Integration token quota": "Quota du jeton d’intégration",
+    "Add quota only to the selected token. The user balance and used quota will not change.": "Ajoutez du quota uniquement au jeton sélectionné. Le solde utilisateur et le quota utilisé restent inchangés.",
+    "User balance": "Solde utilisateur",
+    "Token remaining quota": "Quota restant du jeton",
+    "Amount to add": "Montant à ajouter",
+    "Confirm token quota increase": "Confirmer l’ajout de quota au jeton",
+    "Token quota added successfully": "Quota du jeton ajouté avec succès",
+    "No linked integration tokens": "Aucun jeton d’intégration associé",
+    "Failed to load integration tokens": "Échec du chargement des jetons d’intégration",
+    "Failed to add token quota. Retry with the same amount to avoid duplicate credit.": "Impossible de confirmer l’ajout de quota. Réessayez avec le même montant pour éviter un double crédit.",
+    "已用尽": "Épuisé"
   }
 }

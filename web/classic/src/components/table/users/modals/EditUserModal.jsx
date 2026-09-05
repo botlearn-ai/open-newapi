@@ -57,6 +57,7 @@ import {
   IconEdit,
 } from '@douyinfe/semi-icons';
 import UserBindingManagementModal from './UserBindingManagementModal';
+import UserIntegrationTokensModal from './UserIntegrationTokensModal';
 
 const { Text, Title } = Typography;
 
@@ -65,6 +66,8 @@ const EditUserModal = (props) => {
   const userId = props.editingUser.id;
   const [loading, setLoading] = useState(true);
   const [adjustModalOpen, setAdjustModalOpen] = useState(false);
+  const [integrationTokensVisible, setIntegrationTokensVisible] =
+    useState(false);
   const [adjustQuotaLocal, setAdjustQuotaLocal] = useState('');
   const [adjustAmountLocal, setAdjustAmountLocal] = useState('');
   const [adjustMode, setAdjustMode] = useState('add');
@@ -170,7 +173,11 @@ const EditUserModal = (props) => {
   const adjustQuota = async () => {
     const quotaVal = parseInt(adjustQuotaLocal) || 0;
     if (quotaVal <= 0 && adjustMode !== 'override') return;
-    if (adjustMode === 'override' && (adjustQuotaLocal === '' || adjustQuotaLocal == null)) return;
+    if (
+      adjustMode === 'override' &&
+      (adjustQuotaLocal === '' || adjustQuotaLocal == null)
+    )
+      return;
     setAdjustLoading(true);
     try {
       const res = await API.post('/api/user/manage', {
@@ -392,6 +399,15 @@ const EditUserModal = (props) => {
                       </Col>
 
                       <Col span={24}>
+                        <Button
+                          icon={<IconEdit />}
+                          onClick={() => setIntegrationTokensVisible(true)}
+                        >
+                          {t('Integration token quota')}
+                        </Button>
+                      </Col>
+
+                      <Col span={24}>
                         <div
                           className='text-xs cursor-pointer'
                           style={{ color: 'var(--semi-color-text-2)' }}
@@ -401,7 +417,10 @@ const EditUserModal = (props) => {
                             ? `▾ ${t('收起原生额度输入')}`
                             : `▸ ${t('使用原生额度输入')}`}
                         </div>
-                        <div style={{ display: showQuotaInput ? 'block' : 'none' }} className='mt-2'>
+                        <div
+                          style={{ display: showQuotaInput ? 'block' : 'none' }}
+                          className='mt-2'
+                        >
                           <Form.InputNumber
                             field='quota'
                             label={t('额度')}
@@ -451,6 +470,15 @@ const EditUserModal = (props) => {
           </Form>
         </Spin>
       </SideSheet>
+
+      {userId && (
+        <UserIntegrationTokensModal
+          key={userId}
+          userId={userId}
+          visible={integrationTokensVisible}
+          onCancel={() => setIntegrationTokensVisible(false)}
+        />
+      )}
 
       <UserBindingManagementModal
         visible={bindingModalVisible}
@@ -539,7 +567,10 @@ const EditUserModal = (props) => {
             ? `▾ ${t('收起原生额度输入')}`
             : `▸ ${t('使用原生额度输入')}`}
         </div>
-        <div style={{ display: showAdjustQuotaRaw ? 'block' : 'none' }} className='mt-2'>
+        <div
+          style={{ display: showAdjustQuotaRaw ? 'block' : 'none' }}
+          className='mt-2'
+        >
           <div className='mb-1'>
             <Text size='small'>{t('额度')}</Text>
           </div>

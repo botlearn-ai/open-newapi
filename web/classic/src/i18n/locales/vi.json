@@ -4213,6 +4213,17 @@
     "并确认自行承担部署": "confirm that I bear legal responsibility arising from deployment",
     "运营和收费行为产生的法律责任": "operation and charging behavior",
     "，": ", ",
-    "、": ", "
+    "、": ", ",
+    "Integration token quota": "Hạn mức token tích hợp",
+    "Add quota only to the selected token. The user balance and used quota will not change.": "Chỉ thêm hạn mức cho token đã chọn. Số dư người dùng và hạn mức đã dùng không thay đổi.",
+    "User balance": "Số dư người dùng",
+    "Token remaining quota": "Hạn mức token còn lại",
+    "Amount to add": "Số tiền cần thêm",
+    "Confirm token quota increase": "Xác nhận thêm hạn mức token",
+    "Token quota added successfully": "Đã thêm hạn mức token thành công",
+    "No linked integration tokens": "Không có token tích hợp được liên kết",
+    "Failed to load integration tokens": "Không thể tải token tích hợp",
+    "Failed to add token quota. Retry with the same amount to avoid duplicate credit.": "Chưa thể xác nhận việc thêm hạn mức. Hãy thử lại với cùng số tiền để tránh cộng trùng.",
+    "已用尽": "Đã hết hạn mức"
   }
 }

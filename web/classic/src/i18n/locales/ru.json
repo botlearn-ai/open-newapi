@@ -3699,6 +3699,17 @@
     "并确认自行承担部署": "confirm that I bear legal responsibility arising from deployment",
     "运营和收费行为产生的法律责任": "operation and charging behavior",
     "，": ", ",
-    "、": ", "
+    "、": ", ",
+    "Integration token quota": "Квота токена интеграции",
+    "Add quota only to the selected token. The user balance and used quota will not change.": "Квота добавляется только выбранному токену. Баланс пользователя и использованная квота не изменятся.",
+    "User balance": "Баланс пользователя",
+    "Token remaining quota": "Оставшаяся квота токена",
+    "Amount to add": "Сумма пополнения",
+    "Confirm token quota increase": "Подтвердить пополнение квоты токена",
+    "Token quota added successfully": "Квота токена успешно пополнена",
+    "No linked integration tokens": "Нет связанных токенов интеграции",
+    "Failed to load integration tokens": "Не удалось загрузить токены интеграции",
+    "Failed to add token quota. Retry with the same amount to avoid duplicate credit.": "Не удалось подтвердить пополнение квоты. Повторите с той же суммой, чтобы избежать двойного зачисления.",
+    "已用尽": "Исчерпано"
   }
 }
