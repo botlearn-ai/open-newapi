@@ -3648,6 +3648,17 @@
     "并确认自行承担部署": "confirm that I bear legal responsibility arising from deployment",
     "运营和收费行为产生的法律责任": "operation and charging behavior",
     "，": ", ",
-    "、": ", "
+    "、": ", ",
+    "Integration token quota": "連携トークンのクォータ",
+    "Add quota only to the selected token. The user balance and used quota will not change.": "選択したトークンのクォータのみを追加します。ユーザー残高と使用済みクォータは変更されません。",
+    "User balance": "ユーザー残高",
+    "Token remaining quota": "トークンの残りクォータ",
+    "Amount to add": "追加する金額",
+    "Confirm token quota increase": "トークンのクォータ追加を確定",
+    "Token quota added successfully": "トークンのクォータを追加しました",
+    "No linked integration tokens": "関連する連携トークンはありません",
+    "Failed to load integration tokens": "連携トークンの読み込みに失敗しました",
+    "Failed to add token quota. Retry with the same amount to avoid duplicate credit.": "クォータの追加を確認できませんでした。重複加算を防ぐため、同じ金額で再試行してください。",
+    "已用尽": "使い切りました"
   }
 }

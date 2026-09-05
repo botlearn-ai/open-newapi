@@ -2625,6 +2625,17 @@
     "并确认自行承担部署": "并确认自行承担部署",
     "运营和收费行为产生的法律责任": "运营和收费行为产生的法律责任",
     "，": "，",
-    "、": "、"
+    "、": "、",
+    "Integration token quota": "集成令牌额度",
+    "Add quota only to the selected token. The user balance and used quota will not change.": "仅增加所选令牌的额度，用户余额和已用额度保持不变。",
+    "User balance": "用户余额",
+    "Token remaining quota": "令牌剩余额度",
+    "Amount to add": "增加金额",
+    "Confirm token quota increase": "确认增加令牌额度",
+    "Token quota added successfully": "令牌额度增加成功",
+    "No linked integration tokens": "没有关联的集成令牌",
+    "Failed to load integration tokens": "加载集成令牌失败",
+    "Failed to add token quota. Retry with the same amount to avoid duplicate credit.": "未能确认令牌加额成功。请使用相同金额重试，避免重复入账。",
+    "已用尽": "已用尽"
   }
 }

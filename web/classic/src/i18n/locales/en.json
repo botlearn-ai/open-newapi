@@ -3864,6 +3864,17 @@
     "可选：开启签名校验并把密钥填到上方": "Optional: enable signature verification and paste the secret above",
     "把地址填到上方；若开启了签名校验，同时填入密钥": "Paste the URL above, and the signing secret if you enabled signing",
     "飞书对单个机器人限制 100 条/分钟、5 条/秒；超出的告警会排队，并以合并计数的形式上报": "Feishu limits each bot to 100 messages per minute and 5 per second; alerts beyond that are queued and reported as a merged count",
-    "飞书": "Feishu"
+    "飞书": "Feishu",
+    "Integration token quota": "Integration token quota",
+    "Add quota only to the selected token. The user balance and used quota will not change.": "Add quota only to the selected token. The user balance and used quota will not change.",
+    "User balance": "User balance",
+    "Token remaining quota": "Token remaining quota",
+    "Amount to add": "Amount to add",
+    "Confirm token quota increase": "Confirm token quota increase",
+    "Token quota added successfully": "Token quota added successfully",
+    "No linked integration tokens": "No linked integration tokens",
+    "Failed to load integration tokens": "Failed to load integration tokens",
+    "Failed to add token quota. Retry with the same amount to avoid duplicate credit.": "Failed to add token quota. Retry with the same amount to avoid duplicate credit.",
+    "已用尽": "Exhausted"
   }
 }
