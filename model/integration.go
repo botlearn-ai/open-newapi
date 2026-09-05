@@ -16,6 +16,7 @@ type IntegrationAccount struct {
 // service. Idempotency keys are hashed to keep the unique index compact and
 // compatible with SQLite, MySQL, and PostgreSQL.
 type IntegrationOperation struct {
+	AdminId            int    `json:"admin_id,omitempty" gorm:"not null;default:0"`
 	Id                 int    `json:"id"`
 	IntegrationId      string `json:"integration_id" gorm:"type:varchar(64);not null;uniqueIndex:idx_integration_idempotency,priority:1"`
 	IdempotencyKeyHash string `json:"-" gorm:"type:char(64);not null;uniqueIndex:idx_integration_idempotency,priority:2"`
