@@ -72,6 +72,7 @@ import {
   transformUserToFormDefaults,
 } from '../lib'
 import { type User } from '../types'
+import { UserIntegrationTokensDialog } from './user-integration-tokens-dialog'
 import { UserQuotaDialog } from './user-quota-dialog'
 import { useUsers } from './users-provider'
 
@@ -91,6 +92,7 @@ export function UsersMutateDrawer({
   const { triggerRefresh } = useUsers()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [quotaDialogOpen, setQuotaDialogOpen] = useState(false)
+  const [integrationTokensOpen, setIntegrationTokensOpen] = useState(false)
 
   // Fetch groups
   const { data: groupsData } = useQuery({
@@ -395,6 +397,14 @@ export function UsersMutateDrawer({
                     )}
                   />
 
+                  <Button
+                    type='button'
+                    variant='outline'
+                    onClick={() => setIntegrationTokensOpen(true)}
+                  >
+                    {t('Integration token quota')}
+                  </Button>
+
                   <FormField
                     control={form.control}
                     name='remark'
@@ -459,6 +469,15 @@ export function UsersMutateDrawer({
           </SheetFooter>
         </SheetContent>
       </Sheet>
+
+      {currentRow && (
+        <UserIntegrationTokensDialog
+          key={currentRow.id}
+          open={integrationTokensOpen}
+          onOpenChange={setIntegrationTokensOpen}
+          userId={currentRow.id}
+        />
+      )}
 
       {/* Adjust Quota Dialog */}
       {currentRow && (

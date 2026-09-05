@@ -193,3 +193,40 @@ export async function adminUnbindCustomOAuth(
   )
   return res.data
 }
+
+export interface AdminIntegrationToken {
+  account_id: number
+  integration_id: string
+  token_id: number
+  name: string
+  remain_quota: number
+  unlimited_quota: boolean
+  status: number
+  expired_time: number
+}
+
+export async function getAdminIntegrationTokens(userId: number) {
+  const res = await api.get<
+    ApiResponse<{
+      user_quota: number
+      tokens: AdminIntegrationToken[]
+    }>
+  >(`/api/user/${userId}/integration-tokens`)
+  if (!res.data.success || !res.data.data) throw new Error(res.data.message)
+  return res.data.data
+}
+
+export async function addAdminIntegrationTokenQuota(payload: {
+  userId: number
+  tokenId: number
+  quota: number
+  idempotencyKey: string
+}) {
+  const res = await api.post<ApiResponse<{ replayed: boolean }>>(
+    `/api/user/${payload.userId}/integration-tokens/${payload.tokenId}/quota`,
+    { quota: payload.quota },
+    { headers: { 'Idempotency-Key': payload.idempotencyKey } }
+  )
+  if (!res.data.success) throw new Error(res.data.message)
+  return res.data.data
+}
