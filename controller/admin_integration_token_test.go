@@ -142,3 +142,39 @@ func TestAdminIntegrationTokenQuotaConcurrentReplay(t *testing.T) {
 	_, err = service.AddAdminIntegrationTokenQuota(999, a.UserId, a.Token.Id, 1, strings.Repeat("x", 300))
 	require.Error(t, err)
 }
+
+func TestAdminIntegrationUSDTopUp(t *testing.T) {
+	setupBotcordControllerTestDB(t)
+	require.NoError(t, model.DB.AutoMigrate(&model.Log{}))
+	account := postIntegrationProvision(t, "partner-a", dto.IntegrationProvisionRequest{ExternalUserId: "usd-user", InitialUsd: 5})
+	call := func(role int, amount float64, key string) tokenAPIResponse {
+		ctx, recorder := newAuthenticatedContext(t, http.MethodPost, "/", map[string]any{"amount_usd": amount}, 999)
+		ctx.Set("role", role)
+		ctx.Params = gin.Params{{Key: "id", Value: fmt.Sprint(account.UserId)}, {Key: "token_id", Value: fmt.Sprint(account.Token.Id)}}
+		ctx.Request.Header.Set("Idempotency-Key", key)
+		AdminTopUpIntegration(ctx)
+		return decodeAPIResponse(t, recorder)
+	}
+	require.False(t, call(common.RoleCommonUser, 2, "usd").Success)
+	require.False(t, call(common.RoleAdminUser, 0, "zero").Success)
+	require.False(t, call(common.RoleAdminUser, -1, "negative").Success)
+	require.False(t, call(common.RoleAdminUser, 2, "").Success)
+	require.True(t, call(common.RoleAdminUser, 2.5, "usd").Success)
+	require.True(t, call(common.RoleAdminUser, 2.5, "usd").Success)
+	require.False(t, call(common.RoleAdminUser, 3, "usd").Success)
+	user, err := model.GetUserById(account.UserId, false)
+	require.NoError(t, err)
+	var token model.Token
+	require.NoError(t, model.DB.First(&token, account.Token.Id).Error)
+	require.Equal(t, int(7.5*common.QuotaPerUnit), user.Quota)
+	require.Equal(t, user.Quota, token.RemainQuota)
+	var logs []model.Log
+	require.NoError(t, model.LOG_DB.Find(&logs).Error)
+	require.Len(t, logs, 1)
+	// Token failures roll back the entire recharge, including the user balance.
+	require.NoError(t, model.DB.Model(&token).Update("unlimited_quota", true).Error)
+	require.False(t, call(common.RoleAdminUser, 2, "rollback").Success)
+	user, err = model.GetUserById(account.UserId, false)
+	require.NoError(t, err)
+	require.Equal(t, int(7.5*common.QuotaPerUnit), user.Quota)
+}

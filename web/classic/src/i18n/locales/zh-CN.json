@@ -3858,6 +3858,11 @@
     "No linked integration tokens": "没有关联的集成令牌",
     "Failed to load integration tokens": "加载集成令牌失败",
     "Failed to add token quota. Retry with the same amount to avoid duplicate credit.": "未能确认令牌加额成功。请使用相同金额重试，避免重复入账。",
-    "已用尽": "已用尽"
+    "已用尽": "已用尽",
+    "Top up user and token (USD)": "充值用户和令牌（USD）",
+    "Add the entered USD amount to both the user balance and the selected integration token.": "输入的 USD 金额将同时增加到用户余额和所选集成令牌。",
+    "Confirm USD top-up": "确认充值",
+    "USD top-up successful": "充值成功",
+    "Top-up failed. Retry with the same amount to avoid duplicate credit.": "充值失败，请使用相同金额重试，避免重复入账。"
   }
 }

@@ -221,10 +221,13 @@ export async function addAdminIntegrationTokenQuota(payload: {
   tokenId: number
   quota: number
   idempotencyKey: string
+  amountUSD?: number
 }) {
   const res = await api.post<ApiResponse<{ replayed: boolean }>>(
-    `/api/user/${payload.userId}/integration-tokens/${payload.tokenId}/quota`,
-    { quota: payload.quota },
+    `/api/user/${payload.userId}/integration-tokens/${payload.tokenId}/${payload.amountUSD === undefined ? 'quota' : 'topup'}`,
+    payload.amountUSD === undefined
+      ? { quota: payload.quota }
+      : { amount_usd: payload.amountUSD },
     { headers: { 'Idempotency-Key': payload.idempotencyKey } }
   )
   if (!res.data.success) throw new Error(res.data.message)

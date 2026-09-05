@@ -51,6 +51,19 @@ func GetAdminIntegrationTokens(userId int) ([]AdminIntegrationTokenView, error) 
 // AddAdminIntegrationTokenQuota adds credit without changing user quota or used quota.
 // The reserved namespace cannot collide with a normalized integration ID.
 func AddAdminIntegrationTokenQuota(adminId, userId, tokenId, quota int, key string) (bool, error) {
+	return addAdminIntegrationQuota(adminId, userId, tokenId, quota, key, false)
+}
+
+// AddAdminIntegrationUSD credits the user and linked token atomically.
+func AddAdminIntegrationUSD(adminId, userId, tokenId int, usd float64, key string) (bool, error) {
+	quota, err := IntegrationQuotaFromUsd(usd)
+	if err != nil {
+		return false, err
+	}
+	return addAdminIntegrationQuota(adminId, userId, tokenId, quota, key, true)
+}
+
+func addAdminIntegrationQuota(adminId, userId, tokenId, quota int, key string, creditUser bool) (bool, error) {
 	key = strings.TrimSpace(key)
 	if key == "" {
 		return false, ErrIdempotencyKeyRequired
@@ -59,6 +72,11 @@ func AddAdminIntegrationTokenQuota(adminId, userId, tokenId, quota int, key stri
 		return false, errors.New("invalid quota or idempotency key")
 	}
 	namespace := "@admin-token-quota"
+	operation := "admin_token_topup"
+	if creditUser {
+		namespace = "@admin-integration-topup"
+		operation = "admin_topup"
+	}
 	keyHash := fmt.Sprintf("%x", sha256.Sum256([]byte(fmt.Sprintf("%d:%s", adminId, key))))
 	requestHash := fmt.Sprintf("%x", sha256.Sum256([]byte(fmt.Sprintf("%d:%d:%d", userId, tokenId, quota))))
 	replayed := false
@@ -70,7 +88,7 @@ func AddAdminIntegrationTokenQuota(adminId, userId, tokenId, quota int, key stri
 			}
 			return err
 		}
-		op := model.IntegrationOperation{IntegrationId: namespace, IdempotencyKeyHash: keyHash, RequestHash: requestHash, AccountId: account.Id, Operation: "admin_token_topup", Quota: quota, CreatedTime: common.GetTimestamp(), AdminId: adminId}
+		op := model.IntegrationOperation{IntegrationId: namespace, IdempotencyKeyHash: keyHash, RequestHash: requestHash, AccountId: account.Id, Operation: operation, Quota: quota, CreatedTime: common.GetTimestamp(), AdminId: adminId}
 		result := tx.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "integration_id"}, {Name: "idempotency_key_hash"}}, DoNothing: true}).Create(&op)
 		if result.Error != nil {
 			return result.Error
@@ -86,6 +104,15 @@ func AddAdminIntegrationTokenQuota(adminId, userId, tokenId, quota int, key stri
 			replayed = true
 			return nil
 		}
+		if creditUser {
+			result = tx.Model(&model.User{}).Where("id = ?", userId).Update("quota", gorm.Expr("quota + ?", quota))
+			if result.Error != nil {
+				return result.Error
+			}
+			if result.RowsAffected != 1 {
+				return ErrIntegrationAccountNotFound
+			}
+		}
 		result = tx.Model(&model.Token{}).Where("id = ? AND user_id = ? AND unlimited_quota = ? AND remain_quota <= ?", tokenId, userId, false, int(1e9*common.QuotaPerUnit)-quota).Update("remain_quota", gorm.Expr("remain_quota + ?", quota))
 		if result.Error != nil {
 			return result.Error
@@ -96,6 +123,11 @@ func AddAdminIntegrationTokenQuota(adminId, userId, tokenId, quota int, key stri
 		return tx.Model(&model.Token{}).Where("id = ? AND status = ? AND remain_quota > ? AND (expired_time = ? OR expired_time > ?)", tokenId, common.TokenStatusExhausted, 0, -1, common.GetTimestamp()).Update("status", common.TokenStatusEnabled).Error
 	})
 	if err == nil {
+		if creditUser {
+			if cacheErr := model.InvalidateUserCache(userId); cacheErr != nil {
+				common.SysLog(fmt.Sprintf("admin top-up user cache invalidation failed for user %d: %s", userId, cacheErr))
+			}
+		}
 		// Also invalidate on replay, allowing a retry to repair a previous cache failure.
 		if cacheErr := model.InvalidateUserTokensCache(userId); cacheErr != nil {
 			common.SysLog(fmt.Sprintf("admin token top-up cache invalidation failed for user %d: %s", userId, cacheErr))

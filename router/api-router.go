@@ -133,6 +133,7 @@ func SetApiRouter(router *gin.Engine) {
 				adminRoute.GET("/:id/oauth/bindings", controller.GetUserOAuthBindingsByAdmin)
 				adminRoute.DELETE("/:id/oauth/bindings/:provider_id", controller.UnbindCustomOAuthByAdmin)
 				adminRoute.DELETE("/:id/bindings/:binding_type", controller.AdminClearUserBinding)
+				adminRoute.POST("/:id/integration-tokens/:token_id/topup", middleware.CriticalRateLimit(), controller.AdminTopUpIntegration)
 				adminRoute.GET("/:id/integration-tokens", controller.AdminGetIntegrationTokens)
 				adminRoute.POST("/:id/integration-tokens/:token_id/quota", middleware.CriticalRateLimit(), controller.AdminAddIntegrationTokenQuota)
 				adminRoute.GET("/:id", controller.GetUser)

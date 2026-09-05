@@ -24,7 +24,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { nanoid } from 'nanoid'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { getCurrencyLabel, formatQuotaWithCurrency } from '@/lib/currency'
+import {
+  getCurrencyDisplay,
+  getCurrencyLabel,
+  formatQuotaWithCurrency,
+} from '@/lib/currency'
 import { parseQuotaFromDollars } from '@/lib/format'
 import { Button } from '@/components/ui/button'
 import {
@@ -42,7 +46,7 @@ import {
   type AdminIntegrationToken,
 } from '../api'
 
-function formatTokenQuota(quota: number) {
+function formatDisplayQuota(quota: number) {
   return formatQuotaWithCurrency(quota, {
     digitsLarge: 6,
     digitsSmall: 6,
@@ -51,6 +55,7 @@ function formatTokenQuota(quota: number) {
 }
 
 interface Props {
+  topUp?: boolean
   open: boolean
   onOpenChange: (open: boolean) => void
   userId: number
@@ -58,6 +63,10 @@ interface Props {
 
 export function UserIntegrationTokensDialog(props: Props) {
   const { t } = useTranslation()
+  const formatTokenQuota = (quota: number) =>
+    props.topUp
+      ? `USD ${(quota / getCurrencyDisplay().config.quotaPerUnit).toFixed(6)}`
+      : formatDisplayQuota(quota)
   const requestKeys = useRef(new Map<string, string>())
   const requestKey = (tokenId: number, quota: number) =>
     `${props.userId}:${tokenId}:${quota}`
@@ -81,11 +90,18 @@ export function UserIntegrationTokensDialog(props: Props) {
       <DialogContent className='max-h-[85vh] overflow-y-auto'>
         <DialogHeader>
           <DialogTitle>
-            {t('Integration token quota')} · #{props.userId}
+            {t(
+              props.topUp
+                ? 'Top up user and token (USD)'
+                : 'Integration token quota'
+            )}{' '}
+            · #{props.userId}
           </DialogTitle>
           <DialogDescription>
             {t(
-              'Add quota only to the selected token. The user balance and used quota will not change.'
+              props.topUp
+                ? 'Add the entered USD amount to both the user balance and the selected integration token.'
+                : 'Add quota only to the selected token. The user balance and used quota will not change.'
             )}
           </DialogDescription>
         </DialogHeader>
@@ -109,6 +125,7 @@ export function UserIntegrationTokensDialog(props: Props) {
             {query.data.tokens.map((token) => (
               <TokenQuotaForm
                 key={`${props.userId}:${token.token_id}`}
+                topUp={props.topUp}
                 userId={props.userId}
                 token={token}
                 getRequestKey={getRequestKey}
@@ -125,21 +142,31 @@ export function UserIntegrationTokensDialog(props: Props) {
 }
 
 function TokenQuotaForm(props: {
+  topUp?: boolean
   userId: number
   token: AdminIntegrationToken
   getRequestKey: (tokenId: number, quota: number) => string
   clearRequestKey: (quota: number) => void
 }) {
   const { t } = useTranslation()
+  const formatTokenQuota = (quota: number) =>
+    props.topUp
+      ? `USD ${(quota / getCurrencyDisplay().config.quotaPerUnit).toFixed(6)}`
+      : formatDisplayQuota(quota)
   const client = useQueryClient()
+  const toQuota = (amount: number) =>
+    props.topUp
+      ? Math.round(amount * getCurrencyDisplay().config.quotaPerUnit)
+      : parseQuotaFromDollars(amount)
   const schema = z.object({
     amount: z.string().refine((value) => {
       const amount = Number(value)
       return (
         Number.isFinite(amount) &&
         amount > 0 &&
-        Number.isSafeInteger(parseQuotaFromDollars(amount)) &&
-        parseQuotaFromDollars(amount) > 0
+        amount <= 1e9 &&
+        Number.isSafeInteger(toQuota(amount)) &&
+        toQuota(amount) > 0
       )
     }, t('Enter a positive amount')),
   })
@@ -148,7 +175,11 @@ function TokenQuotaForm(props: {
     defaultValues: { amount: '' },
   })
   const mutation = useMutation({
-    mutationFn: (payload: { quota: number; idempotencyKey: string }) =>
+    mutationFn: (payload: {
+      quota: number
+      idempotencyKey: string
+      amountUSD?: number
+    }) =>
       addAdminIntegrationTokenQuota({
         ...payload,
         userId: props.userId,
@@ -157,7 +188,13 @@ function TokenQuotaForm(props: {
     onSuccess: (_data, variables) => {
       props.clearRequestKey(variables.quota)
       form.reset()
-      toast.success(t('Token quota added successfully'))
+      toast.success(
+        t(
+          props.topUp
+            ? 'USD top-up successful'
+            : 'Token quota added successfully'
+        )
+      )
       void client.invalidateQueries({
         queryKey: ['admin-integration-tokens', props.userId],
       })
@@ -165,7 +202,9 @@ function TokenQuotaForm(props: {
     onError: () => {
       toast.error(
         t(
-          'Failed to add token quota. Retry with the same amount to avoid duplicate credit.'
+          props.topUp
+            ? 'Top-up failed. Retry with the same amount to avoid duplicate credit.'
+            : 'Failed to add token quota. Retry with the same amount to avoid duplicate credit.'
         )
       )
     },
@@ -173,9 +212,10 @@ function TokenQuotaForm(props: {
   })
   const submit = form.handleSubmit((values) => {
     if (mutation.isPending) return
-    const quota = parseQuotaFromDollars(Number(values.amount))
+    const quota = toQuota(Number(values.amount))
     mutation.mutate({
       quota,
+      amountUSD: props.topUp ? Number(values.amount) : undefined,
       idempotencyKey: props.getRequestKey(props.token.token_id, quota),
     })
   })
@@ -188,7 +228,7 @@ function TokenQuotaForm(props: {
   if (props.token.status === 3 || expired) status = t('Expired')
   if (props.token.status === 4 && !expired) status = t('Exhausted')
   const amountId = `token-quota-${props.token.token_id}`
-  const quota = parseQuotaFromDollars(Number(form.watch('amount')))
+  const quota = toQuota(Number(form.watch('amount')))
   return (
     <form
       onSubmit={submit}
@@ -210,7 +250,7 @@ function TokenQuotaForm(props: {
         <FieldGroup>
           <Field data-invalid={!!form.formState.errors.amount}>
             <FieldLabel htmlFor={amountId}>
-              {t('Amount to add')} ({getCurrencyLabel()})
+              {t('Amount to add')} ({props.topUp ? 'USD' : getCurrencyLabel()})
             </FieldLabel>
             <Input
               id={amountId}
@@ -237,7 +277,11 @@ function TokenQuotaForm(props: {
           <Button type='submit' disabled={mutation.isPending}>
             {mutation.isPending
               ? t('Saving...')
-              : t('Confirm token quota increase')}
+              : t(
+                  props.topUp
+                    ? 'Confirm USD top-up'
+                    : 'Confirm token quota increase'
+                )}
           </Button>
         </FieldGroup>
       )}
