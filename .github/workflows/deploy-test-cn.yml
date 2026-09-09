@@ -1,0 +1,126 @@
+name: Deploy China Test
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: open-newapi-deploy-cn-test
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  CN_REGISTRY: 247328583315.dkr.ecr.cn-northwest-1.amazonaws.com.cn
+  CN_REGION: cn-northwest-1
+  ECR_REPOSITORY: open/open-newapi
+  CANDIDATE_TAG: cn-test-${{ github.sha }}
+
+jobs:
+  deploy-cn-test:
+    name: Publish and deploy China Test
+    if: github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, Linux, ARM64, botlearn-runner-us]
+    timeout-minutes: 60
+    env:
+      DOCKER_CONFIG: /tmp/open-newapi-cn-test-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify immutable source and native ARM64 builder
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = refs/heads/main
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          printf '%s' "$GITHUB_SHA" | grep -Eq '^[0-9a-f]{40}$'
+          test "$(uname -m)" = aarch64
+
+      - name: Create DevOps repository token
+        id: devops-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.DEVOPS_PR_APP_CLIENT_ID }}
+          private-key: ${{ secrets.DEVOPS_PR_APP_PRIVATE_KEY }}
+          owner: readai-team
+          repositories: aibrary-devops
+          permission-contents: read
+
+      - name: Check out deployment action
+        uses: actions/checkout@v4
+        with:
+          repository: readai-team/aibrary-devops
+          ref: main
+          token: ${{ steps.devops-token.outputs.token }}
+          path: .devops
+          persist-credentials: false
+
+      - name: Prepare isolated Docker client configuration
+        run: |
+          set -euo pipefail
+          umask 077
+          test ! -e "$DOCKER_CONFIG"
+          mkdir -p "$DOCKER_CONFIG"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to China ECR
+        uses: ./.github/actions/ecr-login
+        with:
+          label: CN
+          registry: ${{ env.CN_REGISTRY }}
+          region: ${{ env.CN_REGION }}
+          repository: ${{ env.ECR_REPOSITORY }}
+          access-key-id: ${{ secrets.AWS_CN_ACCESS_KEY_ID }}
+          secret-access-key: ${{ secrets.AWS_CN_SECRET_ACCESS_KEY }}
+          session-token: ${{ secrets.AWS_CN_SESSION_TOKEN }}
+
+      - name: Resolve immutable candidate
+        id: candidate
+        run: |
+          set -euo pipefail
+          response="$(aws ecr batch-get-image --region "$CN_REGION" \
+            --repository-name "$ECR_REPOSITORY" --image-ids "imageTag=$CANDIDATE_TAG" --output json)"
+          existing_digest="$(printf '%s' "$response" | jq -r '.images[0].imageId.imageDigest // empty')"
+          failure_code="$(printf '%s' "$response" | jq -r '.failures[0].failureCode // empty')"
+          if [ -n "$existing_digest" ]; then
+            printf '%s' "$existing_digest" | grep -Eq '^sha256:[0-9a-f]{64}$'
+            test -z "$failure_code"
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Reusing immutable candidate $ECR_REPOSITORY:$CANDIDATE_TAG"
+          else
+            test "$failure_code" = ImageNotFound
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build and push immutable ARM64 candidate
+        if: steps.candidate.outputs.exists != 'true'
+        run: |
+          set -euo pipefail
+          image="$CN_REGISTRY/$ECR_REPOSITORY:$CANDIDATE_TAG"
+          docker buildx build --platform linux/arm64 --push \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+            --tag "$image" .
+          docker buildx imagetools inspect "$image"
+
+      - name: Promote and restart China Test
+        uses: ./.devops/.github/actions/deploy-test-cn
+        with:
+          product: open-newapi
+          source-sha: ${{ github.sha }}
+          source-directory: .
+
+      - name: Cleanup isolated Docker state
+        if: always()
+        run: |
+          set +e
+          docker logout "$CN_REGISTRY"
+          case "$DOCKER_CONFIG" in
+            /tmp/open-newapi-cn-test-*) rm -rf -- "$DOCKER_CONFIG" ;;
+            *) echo "::error::Refuse unsafe DOCKER_CONFIG cleanup: $DOCKER_CONFIG"; exit 1 ;;
+          esac
