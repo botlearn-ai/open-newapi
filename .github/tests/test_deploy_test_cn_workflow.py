@@ -50,6 +50,21 @@ def test_cn_test_workflow_hands_off_to_reviewed_devops_action() -> None:
     assert "source-directory: ." in workflow
 
 
+def test_buildx_is_removed_before_the_isolated_docker_config() -> None:
+    workflow = text()
+    setup = workflow.split("- name: Set up Docker Buildx", 1)[1].split(
+        "- name: Log in to China ECR", 1
+    )[0]
+    cleanup = workflow.split("- name: Cleanup isolated Docker state", 1)[1]
+
+    assert "id: buildx" in setup
+    assert "cleanup: false" in setup
+    assert "cache-binary: false" in setup
+    assert cleanup.index('docker buildx rm "${{ steps.buildx.outputs.name }}"') < cleanup.index(
+        'rm -rf -- "$DOCKER_CONFIG"'
+    )
+
+
 def test_existing_manual_publisher_is_us_only() -> None:
     legacy = (REPO_ROOT / ".github/workflows/deploy-test.yml").read_text(encoding="utf-8")
     assert "\n  workflow_dispatch:\n" in legacy
