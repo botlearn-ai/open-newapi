@@ -23,22 +23,33 @@ import (
 // BillingSession 封装单次请求的预扣费/结算/退款生命周期。
 // 实现 relaycommon.BillingSettler 接口。
 type BillingSession struct {
-	relayInfo        *relaycommon.RelayInfo
-	funding          FundingSource
-	preConsumedQuota int  // 实际预扣额度（信任用户可能为 0）
-	tokenConsumed    int  // 令牌额度实际扣减量
-	extraReserved    int  // 发送前补充预扣的额度（订阅退款时需要单独回滚）
-	trusted          bool // 是否命中信任额度旁路
-	fundingSettled   bool // funding.Settle 已成功，资金来源已提交
-	settled          bool // Settle 全部完成（资金 + 令牌）
-	refunded         bool // Refund 已调用
-	mu               sync.Mutex
+	integrationRequest *model.IntegrationRequest
+	integrationActual  *int
+	relayInfo          *relaycommon.RelayInfo
+	funding            FundingSource
+	preConsumedQuota   int  // 实际预扣额度（信任用户可能为 0）
+	tokenConsumed      int  // 令牌额度实际扣减量
+	extraReserved      int  // 发送前补充预扣的额度（订阅退款时需要单独回滚）
+	trusted            bool // 是否命中信任额度旁路
+	fundingSettled     bool // funding.Settle 已成功，资金来源已提交
+	settled            bool // Settle 全部完成（资金 + 令牌）
+	refunded           bool // Refund 已调用
+	mu                 sync.Mutex
 }
 
 // Settle 根据实际消耗额度进行结算。
 // 资金来源和令牌额度分两步提交：若资金来源已提交但令牌调整失败，
 // 会标记 fundingSettled 防止 Refund 对已提交的资金来源执行退款。
 func (s *BillingSession) Settle(actualQuota int) error {
+	if s.integrationRequest != nil {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		if s.integrationActual != nil && *s.integrationActual != actualQuota {
+			return ErrIdempotencyConflict
+		}
+		s.integrationActual = &actualQuota
+		return settleIntegrationRequest(s.integrationRequest.Id, actualQuota)
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.settled {
@@ -80,6 +91,11 @@ func (s *BillingSession) Settle(actualQuota int) error {
 
 // Refund 退还所有预扣费，幂等安全，异步执行。
 func (s *BillingSession) Refund(c *gin.Context) {
+	if s.integrationRequest != nil {
+		// A relay failure does not prove zero consumption. Keep the durable hold
+		// until final usage or an explicit reconciliation result is available.
+		return
+	}
 	s.mu.Lock()
 	if s.settled || s.refunded || !s.needsRefundLocked() {
 		s.mu.Unlock()
@@ -124,6 +140,9 @@ func (s *BillingSession) Refund(c *gin.Context) {
 
 // NeedsRefund 返回是否存在需要退还的预扣状态。
 func (s *BillingSession) NeedsRefund() bool {
+	if s.integrationRequest != nil {
+		return false
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.needsRefundLocked()
@@ -150,6 +169,12 @@ func (s *BillingSession) GetPreConsumedQuota() int {
 }
 
 func (s *BillingSession) Reserve(targetQuota int) error {
+	if s.integrationRequest != nil {
+		if targetQuota > s.preConsumedQuota {
+			return integrationBudgetError()
+		}
+		return nil
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -344,6 +369,9 @@ func NewBillingSession(c *gin.Context, relayInfo *relaycommon.RelayInfo, preCons
 		return nil, types.NewError(fmt.Errorf("relayInfo is nil"), types.ErrorCodeInvalidRequest, types.ErrOptionWithSkipRetry())
 	}
 
+	if c.GetHeader(IntegrationRequestHeader) != "" {
+		return claimIntegrationBilling(c, relayInfo, preConsumedQuota)
+	}
 	pref := common.NormalizeBillingPreference(relayInfo.UserSetting.BillingPreference)
 
 	// 钱包路径需要先检查用户额度

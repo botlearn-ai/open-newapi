@@ -1,10 +1,11 @@
 package dto
 
 type IntegrationProvisionRequest struct {
-	ExternalUserId string  `json:"external_user_id"`
-	DisplayName    string  `json:"display_name"`
-	InitialQuota   int     `json:"initial_quota"`
-	InitialUsd     float64 `json:"initial_usd"`
+	BillingProtocol string  `json:"billing_protocol,omitempty"`
+	ExternalUserId  string  `json:"external_user_id"`
+	DisplayName     string  `json:"display_name"`
+	InitialQuota    int     `json:"initial_quota"`
+	InitialUsd      float64 `json:"initial_usd"`
 }
 
 type IntegrationTopUpRequest struct {
@@ -35,4 +36,15 @@ type IntegrationBalanceView struct {
 	UsedUsd        float64              `json:"used_usd"`
 	Replayed       bool                 `json:"replayed,omitempty"`
 	Token          IntegrationTokenView `json:"token"`
+}
+
+// IntegrationRequestInput is a server-to-server authorization, not a model prompt.
+type IntegrationRequestInput struct {
+	ExternalUserId string `json:"external_user_id"`
+	RequestKey     string `json:"request_key"`
+	Path           string `json:"path"`
+	BodySHA256     string `json:"body_sha256"`
+	MaxQuota       int    `json:"max_quota"`
+	// Required for prepare and when cancelling a missing authorization.
+	QuotaPerUsd float64 `json:"quota_per_usd,omitempty"`
 }

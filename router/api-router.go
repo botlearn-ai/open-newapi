@@ -277,6 +277,9 @@ func SetApiRouter(router *gin.Engine) {
 			integrationRoute.POST("/provision", controller.IntegrationProvision)
 			integrationRoute.POST("/balance", controller.IntegrationBalance)
 			integrationRoute.POST("/topup", controller.IntegrationTopUp)
+			integrationRoute.POST("/requests", controller.IntegrationPrepareRequest)
+			integrationRoute.POST("/requests/query", controller.IntegrationGetRequest)
+			integrationRoute.POST("/requests/cancel", controller.IntegrationCancelRequest)
 		}
 
 		// Deprecated compatibility routes for existing BotCord deployments.

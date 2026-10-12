@@ -11,6 +11,7 @@ import (
 	"github.com/QuantumNous/new-api/service"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 func integrationIdFromContext(c *gin.Context) string {
@@ -19,7 +20,7 @@ func integrationIdFromContext(c *gin.Context) string {
 
 func writeIntegrationError(c *gin.Context, err error) {
 	switch {
-	case errors.Is(err, service.ErrIntegrationAccountNotFound):
+	case errors.Is(err, service.ErrIntegrationAccountNotFound), errors.Is(err, gorm.ErrRecordNotFound):
 		c.JSON(http.StatusNotFound, gin.H{
 			"success": false,
 			"message": err.Error(),
@@ -30,7 +31,9 @@ func writeIntegrationError(c *gin.Context, err error) {
 			"message": err.Error(),
 		})
 	case errors.Is(err, service.ErrIdempotencyConflict),
-		errors.Is(err, service.ErrIntegrationIdentityConflict):
+		errors.Is(err, service.ErrIntegrationIdentityConflict),
+		errors.Is(err, service.ErrIntegrationRequestConflict),
+		errors.Is(err, service.ErrIntegrationRequestBudget):
 		c.JSON(http.StatusConflict, gin.H{
 			"success": false,
 			"message": err.Error(),
@@ -97,4 +100,46 @@ func IntegrationTopUp(c *gin.Context) {
 		return
 	}
 	common.ApiSuccess(c, view)
+}
+
+func IntegrationPrepareRequest(c *gin.Context) {
+	var req dto.IntegrationRequestInput
+	if err := c.ShouldBindJSON(&req); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	result, err := service.PrepareIntegrationRequest(integrationIdFromContext(c), req)
+	if err != nil {
+		writeIntegrationError(c, err)
+		return
+	}
+	common.ApiSuccess(c, result)
+}
+
+func IntegrationGetRequest(c *gin.Context) {
+	var req dto.IntegrationRequestInput
+	if err := c.ShouldBindJSON(&req); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	result, err := service.GetIntegrationRequest(integrationIdFromContext(c), req)
+	if err != nil {
+		writeIntegrationError(c, err)
+		return
+	}
+	common.ApiSuccess(c, result)
+}
+
+func IntegrationCancelRequest(c *gin.Context) {
+	var req dto.IntegrationRequestInput
+	if err := c.ShouldBindJSON(&req); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	result, err := service.CancelIntegrationRequest(integrationIdFromContext(c), req)
+	if err != nil {
+		writeIntegrationError(c, err)
+		return
+	}
+	common.ApiSuccess(c, result)
 }

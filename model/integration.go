@@ -3,13 +3,15 @@ package model
 // IntegrationAccount maps one third-party service user to a new-api user and
 // the API token managed by that service.
 type IntegrationAccount struct {
-	Id              int    `json:"id"`
-	IntegrationId   string `json:"integration_id" gorm:"type:varchar(64);not null;uniqueIndex:idx_integration_external,priority:1"`
-	ExternalUserKey string `json:"-" gorm:"type:char(64);not null;uniqueIndex:idx_integration_external,priority:2"`
-	ExternalUserId  string `json:"external_user_id" gorm:"type:text;not null"`
-	UserId          int    `json:"user_id" gorm:"not null;index"`
-	TokenId         int    `json:"token_id" gorm:"not null;index"`
-	CreatedTime     int64  `json:"created_time" gorm:"bigint;not null"`
+	BillingSuspended bool   `json:"billing_suspended" gorm:"not null;default:false"`
+	BillingProtocol  string `json:"billing_protocol" gorm:"type:varchar(32);not null;default:''"`
+	Id               int    `json:"id"`
+	IntegrationId    string `json:"integration_id" gorm:"type:varchar(64);not null;uniqueIndex:idx_integration_external,priority:1"`
+	ExternalUserKey  string `json:"-" gorm:"type:char(64);not null;uniqueIndex:idx_integration_external,priority:2"`
+	ExternalUserId   string `json:"external_user_id" gorm:"type:text;not null"`
+	UserId           int    `json:"user_id" gorm:"not null;index"`
+	TokenId          int    `json:"token_id" gorm:"not null;index"`
+	CreatedTime      int64  `json:"created_time" gorm:"bigint;not null"`
 }
 
 // IntegrationOperation makes credit mutations idempotent for each third-party

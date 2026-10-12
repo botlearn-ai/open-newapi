@@ -367,6 +367,9 @@ func ProvisionIntegrationAccount(
 	req dto.IntegrationProvisionRequest,
 	defaultInitialUsd float64,
 ) (dto.IntegrationBalanceView, error) {
+	if req.BillingProtocol != "" && req.BillingProtocol != IntegrationBillingProtocol {
+		return dto.IntegrationBalanceView{}, ErrIntegrationRequestConflict
+	}
 	integrationId, err := NormalizeIntegrationId(integrationId)
 	if err != nil {
 		return dto.IntegrationBalanceView{}, err
@@ -385,6 +388,7 @@ func ProvisionIntegrationAccount(
 	created := false
 	err = model.DB.Transaction(func(tx *gorm.DB) error {
 		account := model.IntegrationAccount{
+			BillingProtocol: req.BillingProtocol,
 			IntegrationId:   integrationId,
 			ExternalUserKey: externalUserKey,
 			ExternalUserId:  externalUserId,
@@ -410,6 +414,9 @@ func ProvisionIntegrationAccount(
 			if loadErr != nil {
 				return loadErr
 			}
+			if existingAccount.BillingProtocol != req.BillingProtocol {
+				return ErrIntegrationRequestConflict
+			}
 			account = *existingAccount
 			user = *existingUser
 			token = *existingToken
@@ -425,6 +432,9 @@ func ProvisionIntegrationAccount(
 			return adoptErr
 		}
 		if adopted {
+			if req.BillingProtocol != "" {
+				return ErrIntegrationRequestConflict
+			}
 			user = *legacyUser
 			token = *legacyToken
 			return tx.Model(&account).Select("user_id", "token_id").Updates(map[string]any{
