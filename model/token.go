@@ -198,8 +198,8 @@ func ValidateUserToken(key string) (token *Token, err error) {
 		}
 		if token.ExpiredTime != -1 && token.ExpiredTime < common.GetTimestamp() {
 			if !common.RedisEnabled {
-				token.Status = common.TokenStatusExpired
-				err := token.SelectUpdate()
+				err := DB.Model(&Token{}).Where("id = ? AND status = ? AND expired_time != -1 AND expired_time < ?", token.Id, common.TokenStatusEnabled, common.GetTimestamp()).
+					Update("status", common.TokenStatusExpired).Error
 				if err != nil {
 					common.SysLog("failed to update token status" + err.Error())
 				}
@@ -208,8 +208,10 @@ func ValidateUserToken(key string) (token *Token, err error) {
 		}
 		if !token.UnlimitedQuota && token.RemainQuota <= 0 {
 			if !common.RedisEnabled {
-				token.Status = common.TokenStatusExhausted
-				err := token.SelectUpdate()
+				// A settlement may have refunded this token after the read. Never
+				// overwrite its balance or mark a now-funded/disabled token exhausted.
+				err := DB.Model(&Token{}).Where("id = ? AND status = ? AND unlimited_quota = ? AND remain_quota <= 0", token.Id, common.TokenStatusEnabled, false).
+					Update("status", common.TokenStatusExhausted).Error
 				if err != nil {
 					common.SysLog("failed to update token status" + err.Error())
 				}

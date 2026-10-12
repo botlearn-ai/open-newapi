@@ -47,10 +47,10 @@ func hasCustomModelRatio(modelName string, currentRatio float64) bool {
 	return currentRatio != defaultRatio
 }
 
-func calculateAudioQuota(info QuotaInfo) int {
+func calculateAudioQuota(info QuotaInfo, unit float64) int {
 	if info.UsePrice {
 		modelPrice := decimal.NewFromFloat(info.ModelPrice)
-		quotaPerUnit := decimal.NewFromFloat(common.QuotaPerUnit)
+		quotaPerUnit := decimal.NewFromFloat(unit)
 		groupRatio := decimal.NewFromFloat(info.GroupRatio)
 
 		quota := modelPrice.Mul(quotaPerUnit).Mul(groupRatio)
@@ -136,7 +136,7 @@ func PreWssConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usag
 		GroupRatio: actualGroupRatio,
 	}
 
-	quota := calculateAudioQuota(quotaInfo)
+	quota := calculateAudioQuota(quotaInfo, billingQuotaPerUnit(relayInfo))
 
 	if userQuota < quota {
 		return fmt.Errorf("user quota is not enough, user quota: %s, need quota: %s", logger.FormatQuota(userQuota), logger.FormatQuota(quota))
@@ -199,7 +199,7 @@ func PostWssConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, mod
 		GroupRatio: groupRatio,
 	}
 
-	quota := calculateAudioQuota(quotaInfo)
+	quota := calculateAudioQuota(quotaInfo, billingQuotaPerUnit(relayInfo))
 	if tieredOk {
 		quota = tieredQuota
 	}
@@ -215,6 +215,10 @@ func PostWssConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, mod
 
 	// record all the consume log even if quota is 0
 	if totalTokens == 0 {
+		if integrationBilling(relayInfo) {
+			logger.LogError(ctx, "integration billing usage missing; pending reconciliation")
+			return
+		}
 		// in this case, must be some error happened
 		// we cannot just return, because we may have to return the pre-consumed quota
 		quota = 0
@@ -222,7 +226,9 @@ func PostWssConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, mod
 		logger.LogError(ctx, fmt.Sprintf("total tokens is 0, cannot consume quota, userId %d, channelId %d, "+
 			"tokenId %d, model %s， pre-consumed quota %d", relayInfo.UserId, relayInfo.ChannelId, relayInfo.TokenId, modelName, relayInfo.FinalPreConsumedQuota))
 	} else {
-		model.UpdateUserUsedQuotaAndRequestCount(relayInfo.UserId, quota)
+		if !integrationBilling(relayInfo) {
+			model.UpdateUserUsedQuotaAndRequestCount(relayInfo.UserId, quota)
+		}
 		model.UpdateChannelUsedQuota(relayInfo.ChannelId, quota)
 	}
 
@@ -255,11 +261,11 @@ func PostWssConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, mod
 	})
 }
 
-func CalcOpenRouterCacheCreateTokens(usage dto.Usage, priceData types.PriceData) int {
+func CalcOpenRouterCacheCreateTokens(usage dto.Usage, priceData types.PriceData, unit float64) int {
 	if priceData.CacheCreationRatio == 1 {
 		return 0
 	}
-	quotaPrice := priceData.ModelRatio / common.QuotaPerUnit
+	quotaPrice := priceData.ModelRatio / unit
 	promptCacheCreatePrice := quotaPrice * priceData.CacheCreationRatio
 	promptCacheReadPrice := quotaPrice * priceData.CacheRatio
 	completionPrice := quotaPrice * priceData.CompletionRatio
@@ -320,7 +326,7 @@ func PostAudioConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, u
 		GroupRatio: groupRatio,
 	}
 
-	quota := calculateAudioQuota(quotaInfo)
+	quota := calculateAudioQuota(quotaInfo, billingQuotaPerUnit(relayInfo))
 	if tieredOk {
 		quota = tieredQuota
 	}
@@ -336,6 +342,10 @@ func PostAudioConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, u
 
 	// record all the consume log even if quota is 0
 	if totalTokens == 0 {
+		if integrationBilling(relayInfo) {
+			logger.LogError(ctx, "integration billing usage missing; pending reconciliation")
+			return
+		}
 		// in this case, must be some error happened
 		// we cannot just return, because we may have to return the pre-consumed quota
 		quota = 0
@@ -343,7 +353,9 @@ func PostAudioConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, u
 		logger.LogError(ctx, fmt.Sprintf("total tokens is 0, cannot consume quota, userId %d, channelId %d, "+
 			"tokenId %d, model %s， pre-consumed quota %d", relayInfo.UserId, relayInfo.ChannelId, relayInfo.TokenId, relayInfo.OriginModelName, relayInfo.FinalPreConsumedQuota))
 	} else {
-		model.UpdateUserUsedQuotaAndRequestCount(relayInfo.UserId, quota)
+		if !integrationBilling(relayInfo) {
+			model.UpdateUserUsedQuotaAndRequestCount(relayInfo.UserId, quota)
+		}
 		model.UpdateChannelUsedQuota(relayInfo.ChannelId, quota)
 	}
 

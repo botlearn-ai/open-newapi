@@ -402,6 +402,10 @@ func TokenAuth() func(c *gin.Context) {
 		if err != nil {
 			return
 		}
+		if err := service.ValidateIntegrationBillingRoute(c, token.UserId); err != nil {
+			abortWithOpenAiMessage(c, http.StatusConflict, "integration billing authorization required")
+			return
+		}
 		c.Next()
 	}
 }

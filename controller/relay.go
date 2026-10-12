@@ -158,7 +158,7 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 
 	// common.SetContextKey(c, constant.ContextKeyTokenCountMeta, meta)
 
-	if priceData.FreeModel {
+	if priceData.FreeModel && c.GetHeader(service.IntegrationRequestHeader) == "" {
 		logger.LogInfo(c, fmt.Sprintf("模型 %s 免费，跳过预扣费", relayInfo.OriginModelName))
 	} else {
 		newAPIError = service.PreConsumeBilling(c, priceData.QuotaToPreConsume, relayInfo)
@@ -174,7 +174,9 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 			if relayInfo.Billing != nil {
 				relayInfo.Billing.Refund(c)
 			}
-			service.ChargeViolationFeeIfNeeded(c, relayInfo, newAPIError)
+			if c.GetHeader(service.IntegrationRequestHeader) == "" {
+				service.ChargeViolationFeeIfNeeded(c, relayInfo, newAPIError)
+			}
 		}
 	}()
 
@@ -322,6 +324,11 @@ func getChannel(c *gin.Context, info *relaycommon.RelayInfo, retryParam *service
 }
 
 func shouldRetry(c *gin.Context, openaiErr *types.NewAPIError, retryTimes int) bool {
+	// A bounded authorization records exactly one upstream attempt, including
+	// ambiguous failures. Retrying would create an unrecorded execution.
+	if c.GetHeader(service.IntegrationRequestHeader) != "" {
+		return false
+	}
 	if openaiErr == nil {
 		return false
 	}

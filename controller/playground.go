@@ -7,6 +7,7 @@ import (
 	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/types"
 
 	"github.com/gin-gonic/gin"
@@ -36,6 +37,10 @@ func Playground(c *gin.Context) {
 	}
 
 	userId := c.GetInt("id")
+	if err := service.ValidateIntegrationBillingRoute(c, userId); err != nil {
+		newAPIError = types.NewError(err, types.ErrorCodeAccessDenied, types.ErrOptionWithSkipRetry())
+		return
+	}
 
 	// Write user context to ensure acceptUnsetRatio is available
 	userCache, err := model.GetUserCache(userId)
