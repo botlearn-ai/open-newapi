@@ -112,7 +112,35 @@ jobs:
             --tag "$image" .
           docker buildx imagetools inspect "$image"
 
-      - name: Promote and restart China Test
+      - name: Resolve immutable migration candidate
+        id: migration-candidate
+        run: |
+          set -euo pipefail
+          response="$(aws ecr batch-get-image --region "$CN_REGION" \
+            --repository-name "$ECR_REPOSITORY" --image-ids "imageTag=$CANDIDATE_TAG-migrate" --output json)"
+          existing_digest="$(printf '%s' "$response" | jq -r '.images[0].imageId.imageDigest // empty')"
+          failure_code="$(printf '%s' "$response" | jq -r '.failures[0].failureCode // empty')"
+          if [ -n "$existing_digest" ]; then
+            printf '%s' "$existing_digest" | grep -Eq '^sha256:[0-9a-f]{64}$'
+            test -z "$failure_code"
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            test "$failure_code" = ImageNotFound
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build and push immutable migration candidate
+        if: steps.migration-candidate.outputs.exists != 'true'
+        run: |
+          set -euo pipefail
+          image="$CN_REGISTRY/$ECR_REPOSITORY:$CANDIDATE_TAG-migrate"
+          docker buildx build --platform linux/arm64 --push \
+            --file Dockerfile.migrate \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+            --tag "$image" .
+          docker buildx imagetools inspect "$image"
+
+      - name: Migrate, promote and restart China Test
         uses: ./.devops/.github/actions/deploy-test-cn
         with:
           product: open-newapi
