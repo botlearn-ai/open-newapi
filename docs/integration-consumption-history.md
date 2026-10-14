@@ -20,6 +20,19 @@ quota 为非负金额，方向由 type 决定。USD = quota / quota_per_usd。
 零余额、令牌过期/轮换/删除不阻止读取账户历史。错误参数返回 400，读取故障返回 503，均为固定脱敏信息。
 响应禁止缓存。现有 balance、token log 和用户日志接口契约保持不变。
 
-Course 旧账户使用此接口展示消费，Course 新 credits 账户使用平台分桶账本；两种来源不混合累加。
-发布时先部署 NewAPI，再部署依赖此接口的 Course。旧版 NewAPI 上 Course 应显示可重试的加载失败。
+## 历史消费汇总
+
+`POST /api/integrations/consumption/summary` 使用相同鉴权、账户校验和错误约定，
+请求只包含 `external_user_id`。响应 `data` 包含该外部 ID、`quota_per_usd`、
+`record_count`、`net_quota`、`first_at`、`last_at`。
+
+单次数据库聚合统计该账户全部保留的消费与退回日志，不受分页或 1,000 条限制。
+`net_quota = SUM(消费 quota) - SUM(退回 quota)`，允许零值和净退回负值；
+`record_count` 包含上述两类记录，起止时间为 Unix 秒。
+没有记录时返回 0 条、0 净额及 null 起止时间。查询不读取日志内容、不返回模型或 token 明细，
+不写入余额或账本。读取或求和失败返回 503，不能替换为零。
+
+Course 旧账户使用汇总接口展示一条历史记录，新 credits 账户使用平台分桶账本；
+两种来源不混合累加。旧逐条分页接口保持兼容。汇总在查询时计算，不新增结算截止时间。
+发布时先部署 NewAPI，再部署依赖汇总接口的 Course。旧版 NewAPI 上 Course 应显示可重试的加载失败。
 无新增环境变量和数据库结构变更；复用 logs 的 user_id/id 索引。

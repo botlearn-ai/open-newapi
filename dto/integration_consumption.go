@@ -1,5 +1,18 @@
 package dto
 
+type IntegrationConsumptionSummaryRequest struct {
+	ExternalUserId string `json:"external_user_id" binding:"required,max=256"`
+}
+
+type IntegrationConsumptionSummary struct {
+	ExternalUserId string  `json:"external_user_id"`
+	QuotaPerUsd    float64 `json:"quota_per_usd"`
+	RecordCount    int64   `json:"record_count"`
+	NetQuota       int64   `json:"net_quota"`
+	FirstAt        *int64  `json:"first_at"`
+	LastAt         *int64  `json:"last_at"`
+}
+
 type IntegrationConsumptionRequest struct {
 	ExternalUserId string `json:"external_user_id" binding:"required,max=256"`
 	BeforeId       int    `json:"before_id" binding:"min=0"`

@@ -55,3 +55,45 @@ func TestIntegrationConsumptionAuthenticationAndSafeProjection(t *testing.T) {
 	require.Equal(t, 503, w.Code)
 	require.NotContains(t, w.Body.String(), "SELECT")
 }
+
+func TestIntegrationConsumptionSummaryAuthenticationAndFailure(t *testing.T) {
+	setupBotcordControllerTestDB(t)
+	old := model.LOG_DB
+	model.LOG_DB = model.DB
+	t.Cleanup(func() { model.LOG_DB = old })
+	require.NoError(t, model.LOG_DB.AutoMigrate(&model.Log{}))
+	user := postIntegrationProvision(t, "partner-a", dto.IntegrationProvisionRequest{ExternalUserId: "learner"})
+	require.NoError(t, model.LOG_DB.Create(&model.Log{UserId: user.UserId, Type: model.LogTypeRefund, CreatedAt: 1700000000, Quota: 100, Content: "PRIVATE"}).Error)
+	t.Setenv("INTEGRATION_CLIENTS", `{"partner-a":"test-secret","partner-b":"other-secret"}`)
+	router := gin.New()
+	router.POST("/summary", middleware.IntegrationAuth(), IntegrationConsumptionSummary)
+	query := func(secret, integration, body string) *httptest.ResponseRecorder {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPost, "/summary", strings.NewReader(body))
+		r.Header.Set("Content-Type", "application/json")
+		r.Header.Set("Authorization", "Bearer "+secret)
+		r.Header.Set("X-Integration-ID", integration)
+		router.ServeHTTP(w, r)
+		return w
+	}
+	body := `{"external_user_id":"learner"}`
+	require.Equal(t, 401, query("wrong", "partner-a", body).Code)
+	require.Equal(t, 404, query("other-secret", "partner-b", body).Code)
+	require.Equal(t, 400, query("test-secret", "partner-a", `{}`).Code)
+	w := query("test-secret", "partner-a", body)
+	require.Equal(t, 200, w.Code)
+	require.Equal(t, "no-store", w.Header().Get("Cache-Control"))
+	require.NotContains(t, w.Body.String(), "PRIVATE")
+	require.NotContains(t, w.Body.String(), "entries")
+	var result struct {
+		Data dto.IntegrationConsumptionSummary `json:"data"`
+	}
+	require.NoError(t, common.Unmarshal(w.Body.Bytes(), &result))
+	require.EqualValues(t, -100, result.Data.NetQuota)
+	require.EqualValues(t, 1, result.Data.RecordCount)
+	require.NoError(t, model.LOG_DB.Migrator().DropTable(&model.Log{}))
+	w = query("test-secret", "partner-a", body)
+	require.Equal(t, 503, w.Code)
+	require.Equal(t, "no-store", w.Header().Get("Cache-Control"))
+	require.NotContains(t, w.Body.String(), "SELECT")
+}
