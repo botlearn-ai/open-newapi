@@ -4,10 +4,9 @@ ARG TARGETARCH
 ENV CGO_ENABLED=0
 WORKDIR /build
 COPY go.mod go.sum ./
-RUN go mod download
 COPY migration ./migration
 COPY cmd/migrate ./cmd/migrate
-RUN GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-arm64} go build -trimpath -ldflags="-s -w" -o /newapi-migrate ./cmd/migrate
+RUN GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-arm64} go build -mod=readonly -trimpath -ldflags="-s -w" -o /newapi-migrate ./cmd/migrate
 
 FROM debian:bookworm-slim@sha256:f06537653ac770703bc45b4b113475bd402f451e85223f0f2837acbf89ab020a
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
