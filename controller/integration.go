@@ -103,6 +103,27 @@ func IntegrationConsumption(c *gin.Context) {
 	common.ApiSuccess(c, page)
 }
 
+func IntegrationConsumptionSummary(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	var req dto.IntegrationConsumptionSummaryRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "invalid consumption query"})
+		return
+	}
+	summary, err := service.GetIntegrationConsumptionSummary(integrationIdFromContext(c), req)
+	if err != nil {
+		status := http.StatusServiceUnavailable
+		if errors.Is(err, service.ErrIntegrationConsumptionInput) {
+			status = http.StatusBadRequest
+		} else if errors.Is(err, service.ErrIntegrationAccountNotFound) {
+			status = http.StatusNotFound
+		}
+		c.JSON(status, gin.H{"success": false, "message": "consumption history unavailable"})
+		return
+	}
+	common.ApiSuccess(c, summary)
+}
+
 func IntegrationTopUp(c *gin.Context) {
 	var req dto.IntegrationTopUpRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
