@@ -1,0 +1,51 @@
+name: Migration Check
+on:
+  pull_request:
+    paths:
+      - 'migration/**'
+      - 'cmd/migrate/**'
+      - 'model/integration*.go'
+      - 'Dockerfile.migrate'
+      - 'go.mod'
+      - 'go.sum'
+      - '.github/workflows/migration-check.yml'
+      - '.github/workflows/deploy-test-cn.yml'
+permissions:
+  contents: read
+jobs:
+  migration-tests:
+    name: 三数据库迁移检查
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: test-only-password
+          POSTGRES_DB: newapi_migration_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: test-only-password
+          MYSQL_DATABASE: newapi_migration_test
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd "mysqladmin ping -h localhost -ptest-only-password"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.3'
+          cache: true
+      - name: 验证迁移、数据保留、失败与并发边界
+        env:
+          TEST_MIGRATION_POSTGRES_DSN: postgres://postgres:test-only-password@127.0.0.1:5432/newapi_migration_test?sslmode=disable
+          TEST_MIGRATION_MYSQL_DSN: root:test-only-password@tcp(127.0.0.1:3306)/newapi_migration_test?parseTime=true
+        run: go test ./migration ./cmd/migrate -count=1
+      - name: 编译固定迁移命令
+        run: CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o /tmp/newapi-migrate ./cmd/migrate
