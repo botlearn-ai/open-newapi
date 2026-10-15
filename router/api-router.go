@@ -277,6 +277,7 @@ func SetApiRouter(router *gin.Engine) {
 			integrationRoute.POST("/provision", controller.IntegrationProvision)
 			integrationRoute.POST("/balance", controller.IntegrationBalance)
 			integrationRoute.POST("/consumption", controller.IntegrationConsumption)
+			integrationRoute.POST("/funding", controller.IntegrationFunding)
 			integrationRoute.POST("/consumption/summary", controller.IntegrationConsumptionSummary)
 			integrationRoute.POST("/topup", controller.IntegrationTopUp)
 			integrationRoute.POST("/requests", controller.IntegrationPrepareRequest)
