@@ -213,6 +213,9 @@ func InitDB() (err error) {
 func InitLogDB() (err error) {
 	if os.Getenv("LOG_SQL_DSN") == "" {
 		LOG_DB = DB
+		if common.IsMasterNode {
+			return MigrateIntegrationConsumption(LOG_DB)
+		}
 		return
 	}
 	db, err := chooseDB("LOG_SQL_DSN", true)
@@ -378,7 +381,7 @@ func migrateLOGDB() error {
 	if err = LOG_DB.AutoMigrate(&Log{}); err != nil {
 		return err
 	}
-	return nil
+	return MigrateIntegrationConsumption(LOG_DB)
 }
 
 type sqliteColumnDef struct {

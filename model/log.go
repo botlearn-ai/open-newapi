@@ -32,6 +32,7 @@ func applyExplicitLogTextFilter(tx *gorm.DB, column string, value string) (*gorm
 }
 
 type Log struct {
+	BillingScope      string `json:"-" gorm:"type:varchar(36);not null;default:''"`
 	Id                int    `json:"id" gorm:"index:idx_created_at_id,priority:2;index:idx_user_id_id,priority:2"`
 	UserId            int    `json:"user_id" gorm:"index;index:idx_user_id_id,priority:1"`
 	CreatedAt         int64  `json:"created_at" gorm:"bigint;index:idx_created_at_id,priority:1;index:idx_created_at_type"`
@@ -235,7 +236,12 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 			needRecordIp = true
 		}
 	}
+	scope := c.GetString("billing_scope")
+	if scope == "" {
+		scope = "general"
+	}
 	log := &Log{
+		BillingScope:     scope,
 		UserId:           userId,
 		Username:         username,
 		CreatedAt:        common.GetTimestamp(),
@@ -296,18 +302,19 @@ func RecordTaskBillingLog(params RecordTaskBillingLogParams) {
 		}
 	}
 	log := &Log{
-		UserId:    params.UserId,
-		Username:  username,
-		CreatedAt: common.GetTimestamp(),
-		Type:      params.LogType,
-		Content:   params.Content,
-		TokenName: tokenName,
-		ModelName: params.ModelName,
-		Quota:     params.Quota,
-		ChannelId: params.ChannelId,
-		TokenId:   params.TokenId,
-		Group:     params.Group,
-		Other:     common.MapToJsonStr(params.Other),
+		BillingScope: "general",
+		UserId:       params.UserId,
+		Username:     username,
+		CreatedAt:    common.GetTimestamp(),
+		Type:         params.LogType,
+		Content:      params.Content,
+		TokenName:    tokenName,
+		ModelName:    params.ModelName,
+		Quota:        params.Quota,
+		ChannelId:    params.ChannelId,
+		TokenId:      params.TokenId,
+		Group:        params.Group,
+		Other:        common.MapToJsonStr(params.Other),
 	}
 	err := LOG_DB.Create(log).Error
 	if err != nil {

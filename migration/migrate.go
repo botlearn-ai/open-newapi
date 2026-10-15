@@ -120,7 +120,10 @@ func Run(ctx context.Context, db *gorm.DB) error {
 				defer cancel()
 				conn.WithContext(cleanup).Exec("SELECT RELEASE_LOCK('newapi-schema-migrations')")
 			}()
-			return apply(conn, string(sql), checksum)
+			if err := apply(conn, string(sql), checksum); err != nil {
+				return err
+			}
+			return applySpending(conn)
 		}
 		return conn.Transaction(func(tx *gorm.DB) error {
 			if dialect == "postgres" {
@@ -134,7 +137,10 @@ func Run(ctx context.Context, db *gorm.DB) error {
 					return err
 				}
 			}
-			return apply(tx, string(sql), checksum)
+			if err := apply(tx, string(sql), checksum); err != nil {
+				return err
+			}
+			return applySpending(tx)
 		})
 	})
 }
@@ -155,7 +161,7 @@ func apply(db *gorm.DB, sql, checksum string) error {
 		}
 	}
 	var history []ledgerRow
-	if err := db.Table(ledgerTable).Select("version, checksum").Find(&history).Error; err != nil {
+	if err := db.Table(ledgerTable).Select("version, checksum").Where("version <> ?", spendingVersion).Find(&history).Error; err != nil {
 		return err
 	}
 	if len(history) > 1 || (len(history) == 1 && (history[0].Version != version || history[0].Checksum != checksum)) {
@@ -190,7 +196,7 @@ func apply(db *gorm.DB, sql, checksum string) error {
 		}
 	}
 	var final []ledgerRow
-	if err := db.Table(ledgerTable).Select("version, checksum").Find(&final).Error; err != nil {
+	if err := db.Table(ledgerTable).Select("version, checksum").Where("version <> ?", spendingVersion).Find(&final).Error; err != nil {
 		return err
 	}
 	if len(final) != 1 || final[0].Version != version || final[0].Checksum != checksum {

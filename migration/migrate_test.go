@@ -78,7 +78,7 @@ func databases(t *testing.T, test func(*testing.T, *gorm.DB)) {
 			sqlDB, err := db.DB()
 			require.NoError(t, err)
 			t.Cleanup(func() { _ = sqlDB.Close() })
-			for _, table := range []string{ledgerTable, "integration_requests", "integration_accounts", "integration_operations", "users", "tokens"} {
+			for _, table := range []string{"integration_consumption_cutovers", "logs", ledgerTable, "integration_requests", "integration_accounts", "integration_operations", "users", "tokens"} {
 				require.NoError(t, db.Migrator().DropTable(table))
 			}
 			test(t, db)
@@ -89,6 +89,8 @@ func databases(t *testing.T, test func(*testing.T, *gorm.DB)) {
 func baseline(t *testing.T, db *gorm.DB) {
 	t.Helper()
 	require.NoError(t, db.AutoMigrate(&legacyAccount{}))
+	require.NoError(t, db.Exec("CREATE TABLE logs (id bigint PRIMARY KEY, quota bigint NOT NULL)").Error)
+	require.NoError(t, db.Exec("INSERT INTO logs (id, quota) VALUES (7, 30)").Error)
 	for _, table := range []string{"users", "tokens", "integration_operations"} {
 		require.NoError(t, db.Exec("CREATE TABLE "+table+" (id bigint PRIMARY KEY, quota bigint NOT NULL)").Error)
 		require.NoError(t, db.Exec("INSERT INTO "+table+" (id, quota) VALUES (1, 17489582)").Error)
@@ -120,7 +122,7 @@ func TestMigrationPreservesDataAndIsIdempotent(t *testing.T) {
 		require.EqualValues(t, 1234, account.CreatedTime)
 		var count int64
 		require.NoError(t, db.Table(ledgerTable).Count(&count).Error)
-		require.EqualValues(t, 1, count)
+		require.EqualValues(t, 2, count)
 		insert := "INSERT INTO integration_requests (account_id, request_key, path, body_sha256, max_quota, quota_per_usd, state, provider_request_id, created_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
 		args := []any{1, "req-1", "/v1/chat/completions", strings.Repeat("b", 64), 100, 500000, "authorized", "provider-1", 12345}
 		require.NoError(t, db.Exec(insert, args...).Error)
@@ -141,7 +143,7 @@ func TestMigrationRejectsUnknownOrChangedHistory(t *testing.T) {
 			databases(t, func(t *testing.T, db *gorm.DB) {
 				baseline(t, db)
 				require.NoError(t, Run(context.Background(), db))
-				require.NoError(t, db.Exec("UPDATE "+ledgerTable+" SET "+corrupt+" = ?", "unknown").Error)
+				require.NoError(t, db.Exec("UPDATE "+ledgerTable+" SET "+corrupt+" = ? WHERE version = ?", "unknown", version).Error)
 				require.ErrorContains(t, Run(context.Background(), db), "history does not match")
 			})
 		})
@@ -197,7 +199,7 @@ func TestMigrationConcurrentServers(t *testing.T) {
 		}
 		var count int64
 		require.NoError(t, db.Table(ledgerTable).Count(&count).Error)
-		require.EqualValues(t, 1, count)
+		require.EqualValues(t, 2, count)
 	})
 }
 
@@ -205,4 +207,21 @@ func TestOpenRequiresExplicitDatabase(t *testing.T) {
 	for _, dsn := range []string{"", "local", "sqlite://", "https://example.test/db"} {
 		t.Run(fmt.Sprintf("%q", dsn), func(t *testing.T) { _, err := Open(dsn); require.Error(t, err) })
 	}
+}
+
+func TestSpendingMigrationFreezesBoundary(t *testing.T) {
+	databases(t, func(t *testing.T, db *gorm.DB) {
+		baseline(t, db)
+		require.NoError(t, Run(context.Background(), db))
+		require.NoError(t, db.Exec("INSERT INTO logs (id, quota) VALUES (8, 10)").Error)
+		require.NoError(t, Run(context.Background(), db))
+		var boundary int
+		require.NoError(t, db.Table("integration_consumption_cutovers").Select("last_log_id").Scan(&boundary).Error)
+		require.Equal(t, 7, boundary)
+		var scope string
+		require.NoError(t, db.Table("logs").Where("id = 8").Select("billing_scope").Scan(&scope).Error)
+		require.Empty(t, scope)
+		require.NoError(t, db.Exec("UPDATE "+ledgerTable+" SET checksum = 'changed' WHERE version = ?", spendingVersion).Error)
+		require.ErrorContains(t, Run(context.Background(), db), "history does not match")
+	})
 }
