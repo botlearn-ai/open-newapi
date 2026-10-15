@@ -316,6 +316,21 @@ func TokenAuth() func(c *gin.Context) {
 		if strings.HasPrefix(key, "Bearer ") || strings.HasPrefix(key, "bearer ") {
 			key = strings.TrimSpace(key[7:])
 		}
+		var scope *integrationScope
+		if strings.HasPrefix(key, "isc1.") {
+			path := c.Request.URL.Path
+			if path != "/v1/chat/completions" && path != "/v1/responses" && path != "/v1/messages" && path != "/v1/models" && !strings.HasPrefix(path, "/v1/models/") {
+				abortWithOpenAiMessage(c, http.StatusUnauthorized, "unsupported integration scope route")
+				return
+			}
+			parsed, err := readIntegrationScope(key)
+			if err != nil {
+				abortWithOpenAiMessage(c, http.StatusUnauthorized, "invalid integration scope")
+				return
+			}
+			scope = &parsed
+			key = parsed.Key
+		}
 		if key == "" || key == "midjourney-proxy" {
 			key = c.Request.Header.Get("mj-api-secret")
 			if strings.HasPrefix(key, "Bearer ") || strings.HasPrefix(key, "bearer ") {
@@ -348,6 +363,13 @@ func TokenAuth() func(c *gin.Context) {
 			return
 		}
 
+		if scope != nil {
+			if err := validateIntegrationScopeOwner(*scope, token); err != nil {
+				abortWithOpenAiMessage(c, http.StatusUnauthorized, "invalid integration scope")
+				return
+			}
+			c.Set("billing_scope", scope.Course)
+		}
 		allowIps := token.GetIpLimits()
 		if len(allowIps) > 0 {
 			clientIp := c.ClientIP()

@@ -14,6 +14,7 @@ func TestIntegrationConsumptionOwnershipPaginationAndReadOnly(t *testing.T) {
 	model.LOG_DB = db
 	t.Cleanup(func() { model.LOG_DB = old })
 	require.NoError(t, db.AutoMigrate(&model.Log{}))
+	require.NoError(t, model.MigrateIntegrationConsumption(db))
 	// Old token, deleted token, zero-cost calls and refund rows remain visible.
 	for _, row := range []model.Log{
 		{Id: 1, UserId: 1, TokenId: 99, Type: model.LogTypeConsume, Quota: 0, ModelName: "old-model"},
@@ -77,6 +78,7 @@ func TestIntegrationConsumptionSummaryAllRetainedRecords(t *testing.T) {
 	model.LOG_DB = db
 	t.Cleanup(func() { model.LOG_DB = old })
 	require.NoError(t, db.AutoMigrate(&model.Log{}))
+	require.NoError(t, model.MigrateIntegrationConsumption(db))
 	req := dto.IntegrationConsumptionSummaryRequest{ExternalUserId: "learner"}
 	empty, err := GetIntegrationConsumptionSummary("course", req)
 	require.NoError(t, err)

@@ -5,12 +5,21 @@ type IntegrationConsumptionSummaryRequest struct {
 }
 
 type IntegrationConsumptionSummary struct {
-	ExternalUserId string  `json:"external_user_id"`
-	QuotaPerUsd    float64 `json:"quota_per_usd"`
-	RecordCount    int64   `json:"record_count"`
-	NetQuota       int64   `json:"net_quota"`
-	FirstAt        *int64  `json:"first_at"`
-	LastAt         *int64  `json:"last_at"`
+	Groups         []IntegrationConsumptionGroup `json:"groups" gorm:"-"`
+	ExternalUserId string                        `json:"external_user_id"`
+	QuotaPerUsd    float64                       `json:"quota_per_usd"`
+	RecordCount    int64                         `json:"record_count"`
+	NetQuota       int64                         `json:"net_quota"`
+	FirstAt        *int64                        `json:"first_at"`
+	LastAt         *int64                        `json:"last_at"`
+}
+
+type IntegrationConsumptionGroup struct {
+	BillingScope string `json:"scope"`
+	RecordCount  int64  `json:"record_count"`
+	NetQuota     int64  `json:"net_quota"`
+	FirstAt      *int64 `json:"first_at"`
+	LastAt       *int64 `json:"last_at"`
 }
 
 type IntegrationConsumptionRequest struct {

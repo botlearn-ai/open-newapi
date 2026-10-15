@@ -19,6 +19,7 @@ func TestIntegrationConsumptionAuthenticationAndSafeProjection(t *testing.T) {
 	model.LOG_DB = model.DB
 	t.Cleanup(func() { model.LOG_DB = old })
 	require.NoError(t, model.LOG_DB.AutoMigrate(&model.Log{}))
+	require.NoError(t, model.MigrateIntegrationConsumption(model.LOG_DB))
 	user := postIntegrationProvision(t, "partner-a", dto.IntegrationProvisionRequest{ExternalUserId: "learner"})
 	require.NoError(t, model.LOG_DB.Create(&model.Log{UserId: user.UserId, Type: model.LogTypeConsume, CreatedAt: 1700000000, ModelName: "test", Quota: 100,
 		Content: "PRIVATE", Other: "PRIVATE", Ip: "PRIVATE", TokenName: "PRIVATE", RequestId: "PRIVATE"}).Error)
@@ -62,6 +63,7 @@ func TestIntegrationConsumptionSummaryAuthenticationAndFailure(t *testing.T) {
 	model.LOG_DB = model.DB
 	t.Cleanup(func() { model.LOG_DB = old })
 	require.NoError(t, model.LOG_DB.AutoMigrate(&model.Log{}))
+	require.NoError(t, model.MigrateIntegrationConsumption(model.LOG_DB))
 	user := postIntegrationProvision(t, "partner-a", dto.IntegrationProvisionRequest{ExternalUserId: "learner"})
 	require.NoError(t, model.LOG_DB.Create(&model.Log{UserId: user.UserId, Type: model.LogTypeRefund, CreatedAt: 1700000000, Quota: 100, Content: "PRIVATE"}).Error)
 	t.Setenv("INTEGRATION_CLIENTS", `{"partner-a":"test-secret","partner-b":"other-secret"}`)
