@@ -598,6 +598,13 @@ func TopUpIntegrationAccount(
 			Update("status", common.TokenStatusEnabled).Error; err != nil {
 			return err
 		}
+		// An overrun suspends controlled billing until new funding arrives. The partner
+		// ledger has already charged the overrun, so this top-up resumes the account.
+		if err := tx.Model(&model.IntegrationAccount{}).
+			Where("id = ? AND billing_suspended = ?", account.Id, true).
+			Update("billing_suspended", false).Error; err != nil {
+			return err
+		}
 		return nil
 	})
 	if err != nil {

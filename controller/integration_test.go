@@ -158,6 +158,45 @@ func TestIntegrationTopUpIsIdempotentAndRestoresExhaustedToken(t *testing.T) {
 	}
 }
 
+func TestIntegrationTopUpResumesSuspendedControlledBilling(t *testing.T) {
+	setupBotcordControllerTestDB(t)
+
+	postIntegrationProvision(t, "partner-a", dto.IntegrationProvisionRequest{
+		ExternalUserId:  "user-1",
+		InitialUsd:      1,
+		BillingProtocol: "bounded-v1",
+	})
+	// An overrun settlement suspended the account.
+	if err := model.DB.Model(&model.IntegrationAccount{}).
+		Where("external_user_id = ?", "user-1").
+		Update("billing_suspended", true).Error; err != nil {
+		t.Fatalf("failed to suspend account: %v", err)
+	}
+
+	ctx, recorder := newAuthenticatedContext(
+		t,
+		http.MethodPost,
+		"/api/integrations/topup",
+		dto.IntegrationTopUpRequest{ExternalUserId: "user-1", AmountUsd: 2},
+		0,
+	)
+	ctx.Set(middleware.IntegrationIdContextKey, "partner-a")
+	ctx.Request.Header.Set("Idempotency-Key", "recharge-1")
+	IntegrationTopUp(ctx)
+	decodeBotcordBalance(t, recorder)
+
+	var account model.IntegrationAccount
+	if err := model.DB.Where("external_user_id = ?", "user-1").First(&account).Error; err != nil {
+		t.Fatalf("failed to load account: %v", err)
+	}
+	if account.BillingSuspended {
+		t.Fatal("expected a confirmed top-up to resume controlled billing")
+	}
+	if account.BillingProtocol != "bounded-v1" {
+		t.Fatalf("expected protocol to stay bounded-v1, got %q", account.BillingProtocol)
+	}
+}
+
 func TestIntegrationTopUpRejectsIdempotencyKeyReuseWithDifferentAmount(t *testing.T) {
 	setupBotcordControllerTestDB(t)
 	postIntegrationProvision(t, "partner-a", dto.IntegrationProvisionRequest{
