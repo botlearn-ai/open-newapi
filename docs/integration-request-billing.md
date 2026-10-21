@@ -3,7 +3,8 @@
 本协议为 Course 额度分桶提供单账户供应商账单。当前实现可本地测试，尚未达到生产开启条件。
 旧账户默认 `billing_protocol=""`，保留原行为。新账户可在集成 provision 请求中显式设置
 `billing_protocol="bounded-v1"`；同一外部身份不能通过重复 provision 更换协议。
-历史账户转换尚未实现，必须先解决跨进程旧请求排空与期初核对。
+历史账户由 Course 的一次性切换脚本把 `billing_protocol` 改为 `bounded-v1` 并按当时余额建立期初；
+切换时仍在执行的旧请求可能留下小额偏差，由 Course 侧预留封顶容忍。
 
 ## 合同
 
@@ -32,7 +33,7 @@
 | settling | actual_quota 已持久化，余额尚未完成结算，charged_quota=0 | 查询原请求触发幂等补结算；不能当作最终账单释放预留 |
 | settled | actual_quota = charged_quota，差额已退回 | 同一金额重复结算无副作用 |
 | cancelled | 明确未执行，金额为零 | 保留原授权避免重用 |
-| disputed | actual_quota 超出上限，保留完整实际金额和原预留 | 新调用暂停，等待有审计的人工裁决 |
+| disputed | actual_quota 超出上限，保留完整实际金额和原预留 | 新调用暂停；该账户下一次集成充值入账时恢复 |
 
 扣费真相保存在主数据库 `integration_requests`，不依赖消费日志开关或独立 LOG_DB。
 先提交不可改额的 settling 事实，再将余额、Token、用户累计用量和终态同事务提交。
