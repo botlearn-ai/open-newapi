@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
@@ -96,9 +97,26 @@ func GlobalWebRateLimit() func(c *gin.Context) {
 
 func GlobalAPIRateLimit() func(c *gin.Context) {
 	if common.GlobalApiRateLimitEnable {
-		return rateLimitFactory(common.GlobalApiRateLimitNum, common.GlobalApiRateLimitDuration, "GA")
+		limit := rateLimitFactory(common.GlobalApiRateLimitNum, common.GlobalApiRateLimitDuration, "GA")
+		return func(c *gin.Context) {
+			// Integration calls share one outbound address for every partner user.
+			// IntegrationAuth applies this per-IP limit to failed authentication instead.
+			if strings.HasPrefix(c.Request.URL.Path, "/api/integrations/") {
+				return
+			}
+			limit(c)
+		}
 	}
 	return defNext
+}
+
+// integrationAuthFailureLimit keeps the public per-IP limit on rejected
+// integration credentials once integration routes skip GlobalAPIRateLimit.
+func integrationAuthFailureLimit() func(c *gin.Context) {
+	if common.GlobalApiRateLimitEnable {
+		return rateLimitFactory(common.GlobalApiRateLimitNum, common.GlobalApiRateLimitDuration, "GA")
+	}
+	return func(c *gin.Context) {}
 }
 
 func CriticalRateLimit() func(c *gin.Context) {
@@ -123,7 +141,7 @@ func IntegrationRateLimit() func(c *gin.Context) {
 				return
 			}
 			key := fmt.Sprintf("rateLimit:IN:integration:%s", integrationId)
-			userRedisRateLimiter(c, common.GlobalApiRateLimitNum, common.GlobalApiRateLimitDuration, key)
+			userRedisRateLimiter(c, common.IntegrationRateLimitNum, common.IntegrationRateLimitDuration, key)
 		}
 	}
 	inMemoryRateLimiter.Init(common.RateLimitKeyExpirationDuration)
@@ -137,8 +155,8 @@ func IntegrationRateLimit() func(c *gin.Context) {
 		key := fmt.Sprintf("IN:integration:%s", integrationId)
 		if !inMemoryRateLimiter.Request(
 			key,
-			common.GlobalApiRateLimitNum,
-			common.GlobalApiRateLimitDuration,
+			common.IntegrationRateLimitNum,
+			common.IntegrationRateLimitDuration,
 		) {
 			c.Status(http.StatusTooManyRequests)
 			c.Abort()

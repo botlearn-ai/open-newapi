@@ -113,6 +113,10 @@ func InitEnv() {
 	GlobalApiRateLimitEnable = GetEnvOrDefaultBool("GLOBAL_API_RATE_LIMIT_ENABLE", true)
 	GlobalApiRateLimitNum = GetEnvOrDefault("GLOBAL_API_RATE_LIMIT", 180)
 	GlobalApiRateLimitDuration = int64(GetEnvOrDefault("GLOBAL_API_RATE_LIMIT_DURATION", 180))
+	// A partner sends several billing calls per model request for all of its users,
+	// so the per-integration ceiling only guards against a runaway client.
+	IntegrationRateLimitNum = GetEnvOrDefault("INTEGRATION_RATE_LIMIT", 30000)
+	IntegrationRateLimitDuration = int64(GetEnvOrDefault("INTEGRATION_RATE_LIMIT_DURATION", 180))
 
 	GlobalWebRateLimitEnable = GetEnvOrDefaultBool("GLOBAL_WEB_RATE_LIMIT_ENABLE", true)
 	GlobalWebRateLimitNum = GetEnvOrDefault("GLOBAL_WEB_RATE_LIMIT", 60)

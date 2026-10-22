@@ -43,9 +43,13 @@ func configuredIntegrationSecret(integrationId string) (string, error) {
 }
 
 func IntegrationAuth() func(c *gin.Context) {
+	failureLimit := integrationAuthFailureLimit()
 	return func(c *gin.Context) {
 		integrationId, err := service.NormalizeIntegrationId(c.GetHeader("X-Integration-ID"))
 		if err != nil {
+			if failureLimit(c); c.IsAborted() {
+				return
+			}
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"success": false,
 				"message": "invalid integration credentials",
@@ -58,6 +62,8 @@ func IntegrationAuth() func(c *gin.Context) {
 			status := http.StatusUnauthorized
 			if strings.Contains(err.Error(), "INTEGRATION_CLIENTS") {
 				status = http.StatusServiceUnavailable
+			} else if failureLimit(c); c.IsAborted() {
+				return
 			}
 			c.JSON(status, gin.H{
 				"success": false,
@@ -68,6 +74,9 @@ func IntegrationAuth() func(c *gin.Context) {
 		}
 		provided, err := integrationBearerToken(c)
 		if err != nil || subtle.ConstantTimeCompare([]byte(provided), []byte(expected)) != 1 {
+			if failureLimit(c); c.IsAborted() {
+				return
+			}
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"success": false,
 				"message": "invalid integration credentials",

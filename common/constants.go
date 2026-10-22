@@ -208,6 +208,10 @@ var (
 	GlobalApiRateLimitNum      int
 	GlobalApiRateLimitDuration int64
 
+	// Authenticated server-to-server integration traffic, keyed by integration ID.
+	IntegrationRateLimitNum      int
+	IntegrationRateLimitDuration int64
+
 	GlobalWebRateLimitEnable   bool
 	GlobalWebRateLimitNum      int
 	GlobalWebRateLimitDuration int64
