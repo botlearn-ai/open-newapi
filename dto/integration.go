@@ -1,5 +1,11 @@
 package dto
 
+type IntegrationCredentialRecoveryRequest struct {
+	ExternalUserId  string `json:"external_user_id" binding:"required,max=512"`
+	ExpectedUserId  int    `json:"expected_user_id" binding:"required,min=1"`
+	ExpectedTokenId int    `json:"expected_token_id" binding:"required,min=1"`
+}
+
 type IntegrationProvisionRequest struct {
 	BillingProtocol string  `json:"billing_protocol,omitempty"`
 	ExternalUserId  string  `json:"external_user_id"`
