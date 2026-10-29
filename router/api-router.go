@@ -275,6 +275,7 @@ func SetApiRouter(router *gin.Engine) {
 		integrationRoute.Use(middleware.IntegrationAuth(), middleware.IntegrationRateLimit())
 		{
 			integrationRoute.POST("/provision", controller.IntegrationProvision)
+			integrationRoute.POST("/credentials/recover", middleware.DisableCache(), controller.IntegrationRecoverCredential)
 			integrationRoute.POST("/balance", controller.IntegrationBalance)
 			integrationRoute.POST("/consumption", controller.IntegrationConsumption)
 			integrationRoute.POST("/funding", controller.IntegrationFunding)
