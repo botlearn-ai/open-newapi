@@ -123,7 +123,10 @@ func Run(ctx context.Context, db *gorm.DB) error {
 			if err := apply(conn, string(sql), checksum); err != nil {
 				return err
 			}
-			return applySpending(conn)
+			if err := applySpending(conn); err != nil {
+				return err
+			}
+			return applyReconciliation(conn)
 		}
 		return conn.Transaction(func(tx *gorm.DB) error {
 			if dialect == "postgres" {
@@ -140,7 +143,10 @@ func Run(ctx context.Context, db *gorm.DB) error {
 			if err := apply(tx, string(sql), checksum); err != nil {
 				return err
 			}
-			return applySpending(tx)
+			if err := applySpending(tx); err != nil {
+				return err
+			}
+			return applyReconciliation(tx)
 		})
 	})
 }
@@ -161,7 +167,7 @@ func apply(db *gorm.DB, sql, checksum string) error {
 		}
 	}
 	var history []ledgerRow
-	if err := db.Table(ledgerTable).Select("version, checksum").Where("version <> ?", spendingVersion).Find(&history).Error; err != nil {
+	if err := db.Table(ledgerTable).Select("version, checksum").Where("version NOT IN ?", []string{spendingVersion, reconciliationVersion}).Find(&history).Error; err != nil {
 		return err
 	}
 	if len(history) > 1 || (len(history) == 1 && (history[0].Version != version || history[0].Checksum != checksum)) {
@@ -196,7 +202,7 @@ func apply(db *gorm.DB, sql, checksum string) error {
 		}
 	}
 	var final []ledgerRow
-	if err := db.Table(ledgerTable).Select("version, checksum").Where("version <> ?", spendingVersion).Find(&final).Error; err != nil {
+	if err := db.Table(ledgerTable).Select("version, checksum").Where("version NOT IN ?", []string{spendingVersion, reconciliationVersion}).Find(&final).Error; err != nil {
 		return err
 	}
 	if len(final) != 1 || final[0].Version != version || final[0].Checksum != checksum {
@@ -228,7 +234,14 @@ func verifySchema(db *gorm.DB) error {
 		"charged_quota":       {kind: "integer", defaultValue: value("0")},
 		"created_time":        {kind: "integer"}, "settled_time": {kind: "integer", defaultValue: value("0")},
 	}
-	for table, expected := range map[string]map[string]columnSpec{"integration_accounts": account, "integration_requests": request} {
+	if err := verifyColumns(db, map[string]map[string]columnSpec{"integration_accounts": account, "integration_requests": request}); err != nil {
+		return err
+	}
+	return verifyIndexes(db)
+}
+
+func verifyColumns(db *gorm.DB, tables map[string]map[string]columnSpec) error {
+	for table, expected := range tables {
 		columns, err := db.Migrator().ColumnTypes(table)
 		if err != nil {
 			return err
@@ -283,26 +296,35 @@ func verifySchema(db *gorm.DB) error {
 			return fmt.Errorf("required columns missing: %s", table)
 		}
 	}
-	return verifyIndexes(db)
+	return nil
 }
 
 func verifyIndexes(db *gorm.DB) error {
+	return verifyTableIndexes(db, "integration_requests", []indexSpec{
+		{"idx_integration_request_key", "account_id,request_key", true},
+		{"idx_integration_requests_state", "state", false},
+	})
+}
+
+type indexSpec struct {
+	name    string
+	columns string
+	unique  bool
+}
+
+func verifyTableIndexes(db *gorm.DB, table string, expected []indexSpec) error {
 	if db.Dialector.Name() == "sqlite" {
 		var list []struct {
 			Name   string
 			Unique int
 		}
-		if err := db.Raw("PRAGMA index_list('integration_requests')").Scan(&list).Error; err != nil {
+		if err := db.Raw("PRAGMA index_list('" + table + "')").Scan(&list).Error; err != nil {
 			return err
 		}
-		for _, want := range []struct {
-			name    string
-			columns string
-			unique  int
-		}{{"idx_integration_request_key", "account_id,request_key", 1}, {"idx_integration_requests_state", "state", 0}} {
+		for _, want := range expected {
 			found := false
 			for _, idx := range list {
-				if idx.Name != want.name || idx.Unique != want.unique {
+				if idx.Name != want.name || (idx.Unique == 1) != want.unique {
 					continue
 				}
 				var cols []struct{ Name string }
@@ -321,15 +343,11 @@ func verifyIndexes(db *gorm.DB) error {
 		}
 		return nil
 	}
-	indexes, err := db.Migrator().GetIndexes("integration_requests")
+	indexes, err := db.Migrator().GetIndexes(table)
 	if err != nil {
 		return err
 	}
-	for _, want := range []struct {
-		name    string
-		columns string
-		unique  bool
-	}{{"idx_integration_request_key", "account_id,request_key", true}, {"idx_integration_requests_state", "state", false}} {
+	for _, want := range expected {
 		found := false
 		for _, idx := range indexes {
 			unique, ok := idx.Unique()

@@ -78,7 +78,7 @@ func databases(t *testing.T, test func(*testing.T, *gorm.DB)) {
 			sqlDB, err := db.DB()
 			require.NoError(t, err)
 			t.Cleanup(func() { _ = sqlDB.Close() })
-			for _, table := range []string{"integration_consumption_cutovers", "logs", ledgerTable, "integration_requests", "integration_accounts", "integration_operations", "users", "tokens"} {
+			for _, table := range []string{"integration_request_reconciliations", "integration_consumption_cutovers", "logs", ledgerTable, "integration_requests", "integration_accounts", "integration_operations", "users", "tokens"} {
 				require.NoError(t, db.Migrator().DropTable(table))
 			}
 			test(t, db)
@@ -122,7 +122,7 @@ func TestMigrationPreservesDataAndIsIdempotent(t *testing.T) {
 		require.EqualValues(t, 1234, account.CreatedTime)
 		var count int64
 		require.NoError(t, db.Table(ledgerTable).Count(&count).Error)
-		require.EqualValues(t, 2, count)
+		require.EqualValues(t, 3, count)
 		insert := "INSERT INTO integration_requests (account_id, request_key, path, body_sha256, max_quota, quota_per_usd, state, provider_request_id, created_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
 		args := []any{1, "req-1", "/v1/chat/completions", strings.Repeat("b", 64), 100, 500000, "authorized", "provider-1", 12345}
 		require.NoError(t, db.Exec(insert, args...).Error)
@@ -199,7 +199,7 @@ func TestMigrationConcurrentServers(t *testing.T) {
 		}
 		var count int64
 		require.NoError(t, db.Table(ledgerTable).Count(&count).Error)
-		require.EqualValues(t, 2, count)
+		require.EqualValues(t, 3, count)
 	})
 }
 
