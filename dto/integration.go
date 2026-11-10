@@ -54,3 +54,11 @@ type IntegrationRequestInput struct {
 	// Required for prepare and when cancelling a missing authorization.
 	QuotaPerUsd float64 `json:"quota_per_usd,omitempty"`
 }
+
+// Zero is an explicit final-cost decision; omission must never mean zero.
+type IntegrationRequestReconciliationInput struct {
+	ProviderRequestId string `json:"provider_request_id"`
+	ActualQuota       *int   `json:"actual_quota"`
+	EvidenceRef       string `json:"evidence_ref"`
+	Reason            string `json:"reason"`
+}

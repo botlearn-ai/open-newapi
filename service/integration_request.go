@@ -85,7 +85,9 @@ func PrepareIntegrationRequest(integrationId string, req dto.IntegrationRequestI
 			return inserted.Error
 		}
 		if inserted.RowsAffected == 0 {
-			if err := tx.Where("account_id = ? AND request_key = ?", account.Id, req.RequestKey).First(&result).Error; err != nil {
+			// The conflicting cancellation may have committed after our initial
+			// account read. A current read is required under MySQL repeatable-read.
+			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("account_id = ? AND request_key = ?", account.Id, req.RequestKey).First(&result).Error; err != nil {
 				return err
 			}
 			if result.Path != req.Path || result.BodySHA256 != req.BodySHA256 || result.MaxQuota != req.MaxQuota || result.QuotaPerUsd != req.QuotaPerUsd {
@@ -271,40 +273,44 @@ func recordIntegrationSettlement(requestId int, actual int) error {
 		return ErrIntegrationRequestConflict
 	}
 	return model.DB.Transaction(func(tx *gorm.DB) error {
-		var request model.IntegrationRequest
-		if err := tx.First(&request, requestId).Error; err != nil {
-			return err
-		}
-		var account model.IntegrationAccount
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&account, request.AccountId).Error; err != nil {
-			return err
-		}
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&request, requestId).Error; err != nil {
-			return err
-		}
-		if request.State == "settling" || request.State == "settled" || request.State == "disputed" {
-			if request.ActualQuota != actual {
-				return ErrIdempotencyConflict
-			}
-			return nil
-		}
-		if request.State != "running" {
-			return ErrIntegrationRequestConflict
-		}
-		if actual > request.MaxQuota {
-			if err := tx.Model(&account).Update("billing_suspended", true).Error; err != nil {
-				return err
-			}
-		}
-		updated := tx.Model(&request).Where("state = ?", "running").Updates(map[string]interface{}{"state": "settling", "actual_quota": actual})
-		if updated.Error != nil {
-			return updated.Error
-		}
-		if updated.RowsAffected != 1 {
-			return ErrIntegrationRequestConflict
+		return recordIntegrationSettlementTx(tx, requestId, actual)
+	})
+}
+
+func recordIntegrationSettlementTx(tx *gorm.DB, requestId int, actual int) error {
+	var request model.IntegrationRequest
+	if err := tx.First(&request, requestId).Error; err != nil {
+		return err
+	}
+	var account model.IntegrationAccount
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&account, request.AccountId).Error; err != nil {
+		return err
+	}
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&request, requestId).Error; err != nil {
+		return err
+	}
+	if request.State == "settling" || request.State == "settled" || request.State == "disputed" {
+		if request.ActualQuota != actual {
+			return ErrIdempotencyConflict
 		}
 		return nil
-	})
+	}
+	if request.State != "running" && request.State != "unresolved" {
+		return ErrIntegrationRequestConflict
+	}
+	if actual > request.MaxQuota {
+		if err := tx.Model(&account).Update("billing_suspended", true).Error; err != nil {
+			return err
+		}
+	}
+	updated := tx.Model(&request).Where("state IN ?", []string{"running", "unresolved"}).Updates(map[string]interface{}{"state": "settling", "actual_quota": actual})
+	if updated.Error != nil {
+		return updated.Error
+	}
+	if updated.RowsAffected != 1 {
+		return ErrIntegrationRequestConflict
+	}
+	return nil
 }
 
 // The wallet, token, counters and terminal state still commit atomically.

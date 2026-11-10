@@ -92,8 +92,15 @@ func (s *BillingSession) Settle(actualQuota int) error {
 // Refund 退还所有预扣费，幂等安全，异步执行。
 func (s *BillingSession) Refund(c *gin.Context) {
 	if s.integrationRequest != nil {
-		// A relay failure does not prove zero consumption. Keep the durable hold
-		// until final usage or an explicit reconciliation result is available.
+		// A relay failure does not prove zero consumption. Explicitly surface the
+		// unresolved bill while preserving the hold; don't keep pretending it runs.
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		if err := model.DB.Model(&model.IntegrationRequest{}).
+			Where("id = ? AND state = ?", s.integrationRequest.Id, "running").
+			Update("state", "unresolved").Error; err != nil {
+			common.SysLog("integration request unresolved-state persistence failed")
+		}
 		return
 	}
 	s.mu.Lock()

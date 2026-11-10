@@ -18,6 +18,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/require"
+	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -26,6 +27,21 @@ func setupIntegrationRequestTest(t *testing.T) (*gorm.DB, dto.IntegrationRequest
 	t.Helper()
 	oldDB, oldLog, oldRedis := model.DB, common.LogConsumeEnabled, common.RedisEnabled
 	var dialect gorm.Dialector = sqlite.Open(":memory:")
+	if dsn := os.Getenv("TEST_INTEGRATION_MYSQL_DSN"); dsn != "" {
+		admin, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+		require.NoError(t, err)
+		scope := fmt.Sprintf("credit_test_%d", time.Now().UnixNano())
+		require.NoError(t, admin.Exec("CREATE DATABASE "+scope).Error)
+		// The DSN must end in /?parseTime=true; only this test-created database is changed.
+		require.True(t, strings.HasSuffix(dsn, "/?parseTime=true"))
+		dialect = mysql.Open(strings.TrimSuffix(dsn, "/?parseTime=true") + "/" + scope + "?parseTime=true")
+		t.Cleanup(func() {
+			require.NoError(t, admin.Exec("DROP DATABASE "+scope).Error)
+			conn, err := admin.DB()
+			require.NoError(t, err)
+			_ = conn.Close()
+		})
+	}
 	if dsn := os.Getenv("TEST_INTEGRATION_POSTGRES_DSN"); dsn != "" {
 		admin, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 		require.NoError(t, err)
@@ -54,7 +70,7 @@ func setupIntegrationRequestTest(t *testing.T) (*gorm.DB, dto.IntegrationRequest
 		model.DB, common.LogConsumeEnabled, common.RedisEnabled = oldDB, oldLog, oldRedis
 		_ = sqlDB.Close()
 	})
-	require.NoError(t, db.AutoMigrate(&model.User{}, &model.Token{}, &model.IntegrationAccount{}, &model.IntegrationRequest{}))
+	require.NoError(t, db.AutoMigrate(&model.User{}, &model.Token{}, &model.IntegrationAccount{}, &model.IntegrationRequest{}, &model.IntegrationRequestReconciliation{}))
 	require.NoError(t, db.Create(&model.User{Id: 1, Username: "credit-test", Status: common.UserStatusEnabled, Quota: 1000}).Error)
 	require.NoError(t, db.Create(&model.Token{Id: 1, UserId: 1, Key: "test-only", Status: common.TokenStatusEnabled, RemainQuota: 1000, ExpiredTime: -1}).Error)
 	_, key, err := integrationExternalIdentity("learner")
@@ -65,8 +81,8 @@ func setupIntegrationRequestTest(t *testing.T) (*gorm.DB, dto.IntegrationRequest
 
 func TestIntegrationRequestConcurrentSettlement(t *testing.T) {
 	db, req, info := setupIntegrationRequestTest(t)
-	if os.Getenv("TEST_INTEGRATION_POSTGRES_DSN") == "" {
-		t.Skip("requires isolated PostgreSQL")
+	if os.Getenv("TEST_INTEGRATION_POSTGRES_DSN") == "" && os.Getenv("TEST_INTEGRATION_MYSQL_DSN") == "" {
+		t.Skip("requires isolated PostgreSQL or MySQL")
 	}
 	conn, err := db.DB()
 	require.NoError(t, err)
@@ -90,8 +106,8 @@ func TestIntegrationRequestConcurrentSettlement(t *testing.T) {
 
 func TestIntegrationRequestConcurrentPrepareAndCancel(t *testing.T) {
 	db, req, _ := setupIntegrationRequestTest(t)
-	if os.Getenv("TEST_INTEGRATION_POSTGRES_DSN") == "" {
-		t.Skip("requires isolated PostgreSQL")
+	if os.Getenv("TEST_INTEGRATION_POSTGRES_DSN") == "" && os.Getenv("TEST_INTEGRATION_MYSQL_DSN") == "" {
+		t.Skip("requires isolated PostgreSQL or MySQL")
 	}
 	conn, err := db.DB()
 	require.NoError(t, err)
@@ -113,8 +129,8 @@ func TestIntegrationRequestConcurrentPrepareAndCancel(t *testing.T) {
 
 func TestIntegrationRequestConcurrentClaimAndCancel(t *testing.T) {
 	db, req, info := setupIntegrationRequestTest(t)
-	if os.Getenv("TEST_INTEGRATION_POSTGRES_DSN") == "" {
-		t.Skip("requires isolated PostgreSQL")
+	if os.Getenv("TEST_INTEGRATION_POSTGRES_DSN") == "" && os.Getenv("TEST_INTEGRATION_MYSQL_DSN") == "" {
+		t.Skip("requires isolated PostgreSQL or MySQL")
 	}
 	conn, err := db.DB()
 	require.NoError(t, err)
@@ -203,7 +219,7 @@ func TestIntegrationRequestUnknownKeepsHoldAndOverrunEvidence(t *testing.T) {
 	assertIntegrationBalance(t, db, 700, 0)
 	pending, err := GetIntegrationRequest("course", req)
 	require.NoError(t, err)
-	require.Equal(t, "running", pending.State)
+	require.Equal(t, "unresolved", pending.State)
 	_, err = CancelIntegrationRequest("course", req)
 	require.ErrorIs(t, err, ErrIntegrationRequestConflict)
 	require.NoError(t, session.Settle(450))
