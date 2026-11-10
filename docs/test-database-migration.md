@@ -27,6 +27,19 @@ MySQL 使用连接级命名锁；其 DDL 隐式提交，因此每条操作检查
 RBAC、准入与单键 Secret 投影，验证前置资源后启用执行器，再运行同一应用提交的测试部署。
 不要只移动旧结构基线，也不要临时把长期服务改成主节点来触发 AutoMigrate。
 
+## 请求结算审计表
+
+`20261110_0003_request_reconciliation` 在既有两项清单之后创建
+`integration_request_reconciliations`，保存请求、操作人、最终费用证据和原因，
+并用 `request_id` 唯一索引防止重复审计决定。迁移沿用原锁、事务、校验和及重跑路径，
+不改写已有请求、用户余额或审计记录。冻结表定义在 `migration/reconciliation.go`，
+实际发送的完整 SQL 参与校验和，字段与索引验证通过后才登记成功。
+
+这是 #25 在中国 test 验收发现的迁移遗漏：长期服务为 `NODE_TYPE=slave`，
+仅注册 GORM AutoMigrate 模型不会创建正式表。发布必须运行独立迁移镜像；
+回滚应用时保留新增表和迁移账本。旧迁移命令会拒绝新版本账本，回滚时不得运行旧迁移命令。
+跟踪：https://github.com/botlearn-ai/botlearn-course/issues/2185。
+
 ## 验证
 
 `go test ./migration ./cmd/migrate -count=1` 默认执行隔离 SQLite 检查。
