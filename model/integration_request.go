@@ -17,3 +17,16 @@ type IntegrationRequest struct {
 	CreatedTime       int64   `json:"created_time" gorm:"bigint;not null"`
 	SettledTime       int64   `json:"settled_time" gorm:"bigint;not null;default:0"`
 }
+
+// IntegrationRequestReconciliation is an immutable, attributable final-cost decision.
+// It is stored with the bill in the primary database, independently of optional logs.
+type IntegrationRequestReconciliation struct {
+	Id                int    `json:"id"`
+	RequestId         int    `json:"request_id" gorm:"not null;uniqueIndex"`
+	AdminId           int    `json:"admin_id" gorm:"not null"`
+	ProviderRequestId string `json:"provider_request_id" gorm:"type:varchar(64);not null"`
+	ActualQuota       int    `json:"actual_quota" gorm:"not null"`
+	EvidenceRef       string `json:"evidence_ref" gorm:"type:text;not null"`
+	Reason            string `json:"reason" gorm:"type:text;not null"`
+	CreatedTime       int64  `json:"created_time" gorm:"bigint;not null"`
+}
