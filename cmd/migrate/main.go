@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -23,7 +24,11 @@ func main() {
 	defer cancel()
 	if err := migration.Run(ctx, db); err != nil {
 		// Driver errors may include connection credentials or row data.
-		fmt.Fprintln(os.Stderr, "NEWAPI_SQL_MIGRATION_FAILED: schema or manifest verification failed")
+		if errors.Is(err, migration.ErrQuotaDataNeedsReview) {
+			fmt.Fprintln(os.Stderr, "NEWAPI_SQL_MIGRATION_FAILED: historical quota data buckets need review")
+		} else {
+			fmt.Fprintln(os.Stderr, "NEWAPI_SQL_MIGRATION_FAILED: schema or manifest verification failed")
+		}
 		os.Exit(1)
 	}
 	fmt.Println("NEWAPI_SQL_MIGRATION_OK: bundled manifest applied and verified")

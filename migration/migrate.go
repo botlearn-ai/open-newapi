@@ -1,4 +1,4 @@
-// Package migration applies only the reviewed integration-billing SQL manifest.
+// Package migration applies only the reviewed SQL manifests.
 // It does not initialize accounts, start the API, or run GORM AutoMigrate.
 package migration
 
@@ -126,7 +126,10 @@ func Run(ctx context.Context, db *gorm.DB) error {
 			if err := applySpending(conn); err != nil {
 				return err
 			}
-			return applyReconciliation(conn)
+			if err := applyReconciliation(conn); err != nil {
+				return err
+			}
+			return applyQuotaData(conn)
 		}
 		return conn.Transaction(func(tx *gorm.DB) error {
 			if dialect == "postgres" {
@@ -146,7 +149,10 @@ func Run(ctx context.Context, db *gorm.DB) error {
 			if err := applySpending(tx); err != nil {
 				return err
 			}
-			return applyReconciliation(tx)
+			if err := applyReconciliation(tx); err != nil {
+				return err
+			}
+			return applyQuotaData(tx)
 		})
 	})
 }
@@ -167,7 +173,8 @@ func apply(db *gorm.DB, sql, checksum string) error {
 		}
 	}
 	var history []ledgerRow
-	if err := db.Table(ledgerTable).Select("version, checksum").Where("version NOT IN ?", []string{spendingVersion, reconciliationVersion}).Find(&history).Error; err != nil {
+	laterVersions := []string{spendingVersion, reconciliationVersion, quotaDataVersion}
+	if err := db.Table(ledgerTable).Select("version, checksum").Where("version NOT IN ?", laterVersions).Find(&history).Error; err != nil {
 		return err
 	}
 	if len(history) > 1 || (len(history) == 1 && (history[0].Version != version || history[0].Checksum != checksum)) {
@@ -202,7 +209,7 @@ func apply(db *gorm.DB, sql, checksum string) error {
 		}
 	}
 	var final []ledgerRow
-	if err := db.Table(ledgerTable).Select("version, checksum").Where("version NOT IN ?", []string{spendingVersion, reconciliationVersion}).Find(&final).Error; err != nil {
+	if err := db.Table(ledgerTable).Select("version, checksum").Where("version NOT IN ?", laterVersions).Find(&final).Error; err != nil {
 		return err
 	}
 	if len(final) != 1 || final[0].Version != version || final[0].Checksum != checksum {

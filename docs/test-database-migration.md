@@ -40,6 +40,37 @@ RBAC、准入与单键 Secret 投影，验证前置资源后启用执行器，�
 回滚应用时保留新增表和迁移账本。旧迁移命令会拒绝新版本账本，回滚时不得运行旧迁移命令。
 跟踪：https://github.com/botlearn-ai/botlearn-course/issues/2185。
 
+## 用量看板小时桶
+
+`20261120_0004_quota_data_bucket` 为 `quota_data` 增加
+`(user_id, username, model_name, created_at)` 复合唯一索引。应用以单条 SQL 将请求数、额度与
+Token 数的增量写进对应小时桶。先使用同一提交的固定迁移镜像，再升级长期服务及增加副本。
+迁移持锁创建索引，运行前核对历史数据量和数据库写入窗口。
+
+迁移检查历史重复键、空键和空计数。存在异常时停止发布，原始统计行保留，不登记此版本成功。
+运维可先通过获准的只读通道检查异常桶数，避免输出用户和模型明细：
+
+```sql
+SELECT COUNT(*) AS duplicate_buckets
+FROM (
+    SELECT 1 FROM quota_data
+    GROUP BY user_id, username, model_name, created_at
+    HAVING COUNT(*) > 1
+) AS duplicates;
+
+SELECT COUNT(*) AS incomplete_buckets
+FROM quota_data
+WHERE user_id IS NULL OR username IS NULL OR model_name IS NULL OR created_at IS NULL
+    OR count IS NULL OR quota IS NULL OR token_used IS NULL;
+```
+
+发现冲突时，另行保护受影响的原始记录，再核对消费日志在对应时段的覆盖、保留及日志库位置。
+旧逻辑会对同一桶的每条重复行累加后续增量，直接求和可能高估。消费日志完整且来源可核验时，
+可据此重算请求数、额度与 Token 数。证据缺失的时段保留历史记录，并单独评审处理范围后重跑迁移。
+此迁移只改用量看板索引，钱包、Token 余额和受控请求结算数据由既有事务维护。
+如应用回滚，先收回额外副本，再回滚应用镜像并保留索引及迁移账本。后续仍使用支持本版本的
+迁移镜像，旧迁移命令会拒绝带有新版本的账本。
+
 ## 验证
 
 `go test ./migration ./cmd/migrate -count=1` 默认执行隔离 SQLite 检查。
