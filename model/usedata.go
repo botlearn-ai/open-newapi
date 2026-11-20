@@ -7,15 +7,16 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // QuotaData 柱状图数据
 type QuotaData struct {
 	Id        int    `json:"id"`
-	UserID    int    `json:"user_id" gorm:"index"`
-	Username  string `json:"username" gorm:"index:idx_qdt_model_user_name,priority:2;size:64;default:''"`
-	ModelName string `json:"model_name" gorm:"index:idx_qdt_model_user_name,priority:1;size:64;default:''"`
-	CreatedAt int64  `json:"created_at" gorm:"bigint;index:idx_qdt_created_at,priority:2"`
+	UserID    int    `json:"user_id" gorm:"index;uniqueIndex:idx_quota_data_bucket,priority:1"`
+	Username  string `json:"username" gorm:"index:idx_qdt_model_user_name,priority:2;size:64;default:'';uniqueIndex:idx_quota_data_bucket,priority:2"`
+	ModelName string `json:"model_name" gorm:"index:idx_qdt_model_user_name,priority:1;size:64;default:'';uniqueIndex:idx_quota_data_bucket,priority:3"`
+	CreatedAt int64  `json:"created_at" gorm:"bigint;index:idx_qdt_created_at,priority:2;uniqueIndex:idx_quota_data_bucket,priority:4"`
 	TokenUsed int    `json:"token_used" gorm:"default:0"`
 	Count     int    `json:"count" gorm:"default:0"`
 	Quota     int    `json:"quota" gorm:"default:0"`
@@ -31,11 +32,18 @@ func UpdateQuotaData() {
 	}
 }
 
-var CacheQuotaData = make(map[string]*QuotaData)
+type quotaDataBucket struct {
+	userID    int
+	username  string
+	modelName string
+	createdAt int64
+}
+
+var CacheQuotaData = make(map[quotaDataBucket]*QuotaData)
 var CacheQuotaDataLock = sync.Mutex{}
 
 func logQuotaDataCache(userId int, username string, modelName string, quota int, createdAt int64, tokenUsed int) {
-	key := fmt.Sprintf("%d-%s-%s-%d", userId, username, modelName, createdAt)
+	key := quotaDataBucket{userID: userId, username: username, modelName: modelName, createdAt: createdAt}
 	quotaData, ok := CacheQuotaData[key]
 	if ok {
 		quotaData.Count += 1
@@ -67,38 +75,34 @@ func LogQuotaData(userId int, username string, modelName string, quota int, crea
 func SaveQuotaDataCache() {
 	CacheQuotaDataLock.Lock()
 	defer CacheQuotaDataLock.Unlock()
-	size := len(CacheQuotaData)
-	// 如果缓存中有数据，就保存到数据库中
-	// 1. 先查询数据库中是否有数据
-	// 2. 如果有数据，就更新数据
-	// 3. 如果没有数据，就插入数据
+	saved := 0
 	for _, quotaData := range CacheQuotaData {
-		quotaDataDB := &QuotaData{}
-		DB.Table("quota_data").Where("user_id = ? and username = ? and model_name = ? and created_at = ?",
-			quotaData.UserID, quotaData.Username, quotaData.ModelName, quotaData.CreatedAt).First(quotaDataDB)
-		if quotaDataDB.Id > 0 {
-			//quotaDataDB.Count += quotaData.Count
-			//quotaDataDB.Quota += quotaData.Quota
-			//DB.Table("quota_data").Save(quotaDataDB)
-			increaseQuotaData(quotaData.UserID, quotaData.Username, quotaData.ModelName, quotaData.Count, quotaData.Quota, quotaData.CreatedAt, quotaData.TokenUsed)
-		} else {
-			DB.Table("quota_data").Create(quotaData)
+		if err := quotaData.AddToBucket(DB); err != nil {
+			// An interrupted write may have committed. Reconcile the chart from logs
+			// before reapplying a delta whose outcome is unknown.
+			continue
 		}
+		saved++
 	}
-	CacheQuotaData = make(map[string]*QuotaData)
-	common.SysLog(fmt.Sprintf("保存数据看板数据成功，共保存%d条数据", size))
+	failed := len(CacheQuotaData) - saved
+	CacheQuotaData = make(map[quotaDataBucket]*QuotaData)
+	if failed > 0 {
+		common.SysError(fmt.Sprintf("数据看板有%d条增量写入结果待核对", failed))
+	}
+	common.SysLog(fmt.Sprintf("数据看板共保存%d条增量", saved))
 }
 
-func increaseQuotaData(userId int, username string, modelName string, count int, quota int, createdAt int64, tokenUsed int) {
-	err := DB.Table("quota_data").Where("user_id = ? and username = ? and model_name = ? and created_at = ?",
-		userId, username, modelName, createdAt).Updates(map[string]interface{}{
-		"count":      gorm.Expr("count + ?", count),
-		"quota":      gorm.Expr("quota + ?", quota),
-		"token_used": gorm.Expr("token_used + ?", tokenUsed),
-	}).Error
-	if err != nil {
-		common.SysLog(fmt.Sprintf("increaseQuotaData error: %s", err))
-	}
+// AddToBucket atomically adds the usage delta to its hourly dashboard bucket.
+func (quotaData QuotaData) AddToBucket(db *gorm.DB) error {
+	quotaData.Id = 0
+	return db.Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name: "user_id"}, {Name: "username"}, {Name: "model_name"}, {Name: "created_at"}},
+		DoUpdates: clause.Assignments(map[string]interface{}{
+			"count":      gorm.Expr("quota_data.count + ?", quotaData.Count),
+			"quota":      gorm.Expr("quota_data.quota + ?", quotaData.Quota),
+			"token_used": gorm.Expr("quota_data.token_used + ?", quotaData.TokenUsed),
+		}),
+	}).Create(&quotaData).Error
 }
 
 func GetQuotaDataByUsername(username string, startTime int64, endTime int64) (quotaData []*QuotaData, err error) {
